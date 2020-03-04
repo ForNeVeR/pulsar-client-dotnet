@@ -92,6 +92,7 @@ type ProducerConfiguration =
         CustomMessageRouter: IMessageRouter option
         AutoUpdatePartitions: bool
         HashingScheme: HashingScheme
+        InitialSequenceId : int64
     }
     member this.BatchingPartitionSwitchFrequencyIntervalMs =
         this.BatchingPartitionSwitchFrequencyByPublishDelay * (int this.BatchingMaxPublishDelay.TotalMilliseconds)
@@ -113,6 +114,7 @@ type ProducerConfiguration =
             CustomMessageRouter = None
             AutoUpdatePartitions = true
             HashingScheme = HashingScheme.DotnetStringHash
+            InitialSequenceId = -1L
         }
 
 type ReaderConfiguration =
