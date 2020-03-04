@@ -264,7 +264,7 @@ type internal ProducerImpl private (producerConfig: ProducerConfiguration, clien
                     let tcs = TaskCompletionSource(TaskContinuationOptions.RunContinuationsAsynchronously)
                     let batchItem = { Message = message; Tcs = tcs }
                     if canAddToCurrentBatch(message) then
-                        // handle boundary cases where message being added would exceed 
+                        // handle boundary cases where message being added would exceed
                         // batch size and/or max message size
                         if batchMessageContainer.Add(batchItem) then
                             Log.Logger.LogDebug("{0} Max batch container size exceeded", prefix)
@@ -282,7 +282,7 @@ type internal ProducerImpl private (producerConfig: ProducerConfiguration, clien
                     let metadata = createMessageMetadata message None
                     let encodedMessage = compressionCodec.Encode message.Value
                     let tcs = TaskCompletionSource(TaskContinuationOptions.RunContinuationsAsynchronously)
-                        
+
                     if (encodedMessage.Length > maxMessageSize) then
                         let ex = InvalidMessageException <| sprintf "Message size is bigger than %i bytes" maxMessageSize
                         interceptors.OnSendAcknowledgement(this, message, Unchecked.defaultof<MessageId>, ex)
@@ -440,7 +440,7 @@ type internal ProducerImpl private (producerConfig: ProducerConfiguration, clien
         producerConfig.BatchingEnabled && not message.DeliverAt.HasValue
 
     member private this.SendMessage (message : MessageBuilder) =
-        let interceptMsg = interceptors.BeforeSend(this, message)            
+        let interceptMsg = interceptors.BeforeSend(this, message)
         if this.CanAddToBatch(interceptMsg) then
             mb.PostAndAsyncReply(fun channel -> StoreBatchItem (interceptMsg, channel))
         else
@@ -511,3 +511,5 @@ type internal ProducerImpl private (producerConfig: ProducerConfiguration, clien
         member this.ProducerId = producerId
 
         member this.Topic = %producerConfig.Topic.CompleteTopicName
+
+        member this.LastSequenceId = 0L
