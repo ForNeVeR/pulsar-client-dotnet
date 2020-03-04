@@ -136,6 +136,8 @@ type internal ProducerImpl private (producerConfig: ProducerConfiguration, clien
             metadata.NumMessagesInBatch <- numMessagesInBatch.Value
         if message.DeliverAt.HasValue then
             metadata.DeliverAtTime <- message.DeliverAt.Value
+        if message.SequenceId.HasValue then
+            metadata.SequenceId <- message.SequenceId.Value
 
         metadata
 
