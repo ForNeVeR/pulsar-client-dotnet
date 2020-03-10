@@ -306,6 +306,7 @@ type internal ClientCnx (config: PulsarClientConfiguration,
             HasNumMessagesInBatch = messageMetadata.ShouldSerializeNumMessagesInBatch()
             CompressionType = messageMetadata.Compression |> mapCompressionType
             UncompressedMessageSize = messageMetadata.UncompressedSize |> int32
+            SequenceId = messageMetadata.SequenceId
         }
         MessageReceived {
             MessageId = { LedgerId = %(int64 cmd.MessageId.ledgerId); EntryId = %(int64 cmd.MessageId.entryId); Type = Individual; Partition = -1; TopicName = %"" }

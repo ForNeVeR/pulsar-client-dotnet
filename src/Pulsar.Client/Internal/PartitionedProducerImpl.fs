@@ -259,3 +259,5 @@ type internal PartitionedProducerImpl private (producerConfig: ProducerConfigura
         member this.Topic = %producerConfig.Topic.CompleteTopicName
 
         member this.LastSequenceId = 0L
+
+        member this.Name = producerConfig.ProducerName

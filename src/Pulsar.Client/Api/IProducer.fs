@@ -26,3 +26,6 @@ type IProducer =
     /// After recreating a producer with the same producer name, this will return the last message that was
     /// published in the previous producer session, or -1 if there no message was ever published.
     abstract member LastSequenceId : int64
+
+    /// Get the producer name
+    abstract member Name: string

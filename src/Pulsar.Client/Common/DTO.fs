@@ -165,6 +165,7 @@ type internal Metadata =
         HasNumMessagesInBatch: bool
         CompressionType: CompressionType
         UncompressedMessageSize: int32
+        SequenceId: uint64
     }
 
 type internal RawMessage =
@@ -183,6 +184,7 @@ type Message =
         Data: byte[]
         Key: string
         Properties: IReadOnlyDictionary<string, string>
+        SequenceId: uint64
     }
 
 type Messages internal(maxNumberOfMessages: int, maxSizeOfMessages: int64) =

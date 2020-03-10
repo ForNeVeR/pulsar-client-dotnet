@@ -117,9 +117,15 @@ type internal ProducerImpl private (producerConfig: ProducerConfiguration, clien
         }
 
     let createMessageMetadata (message : MessageBuilder) (numMessagesInBatch: int option) =
+
+        let sequenceId =
+            if message.SequenceId.HasValue then
+                message.SequenceId.Value
+            else %Generators.getNextSequenceId()
+
         let metadata =
             MessageMetadata (
-                SequenceId = %Generators.getNextSequenceId(),
+                SequenceId = sequenceId,
                 PublishTime = (DateTimeOffset.UtcNow.ToUnixTimeSeconds() |> uint64),
                 ProducerName = producerConfig.ProducerName,
                 UncompressedSize = (message.Value.Length |> uint32)
@@ -136,8 +142,6 @@ type internal ProducerImpl private (producerConfig: ProducerConfiguration, clien
             metadata.NumMessagesInBatch <- numMessagesInBatch.Value
         if message.DeliverAt.HasValue then
             metadata.DeliverAtTime <- message.DeliverAt.Value
-        if message.SequenceId.HasValue then
-            metadata.SequenceId <- message.SequenceId.Value
 
         metadata
 
@@ -515,3 +519,5 @@ type internal ProducerImpl private (producerConfig: ProducerConfiguration, clien
         member this.Topic = %producerConfig.Topic.CompleteTopicName
 
         member this.LastSequenceId = 0L
+
+        member this.Name = producerConfig.ProducerName
