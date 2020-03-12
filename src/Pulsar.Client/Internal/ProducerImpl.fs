@@ -24,6 +24,14 @@ type internal ProducerImpl private (producerConfig: ProducerConfiguration, clien
 
     let compressionCodec = CompressionCodec.create producerConfig.CompressionType
 
+    let lastSequenceId = producerConfig.InitialSequenceId |> Option.defaultValue -1L
+
+    let lastPublishedSequenceId = lastSequenceId
+
+    let lastSequenceIdPushed = lastSequenceId
+
+    let messageIdGenerator =  lastSequenceId + 1L
+
     let protoCompressionType =
         match producerConfig.CompressionType with
             | CompressionType.None -> pulsar.proto.CompressionType.None
@@ -518,6 +526,6 @@ type internal ProducerImpl private (producerConfig: ProducerConfiguration, clien
 
         member this.Topic = %producerConfig.Topic.CompleteTopicName
 
-        member this.LastSequenceId = 0L
+        member this.LastSequenceId = lastSequenceId
 
         member this.Name = producerConfig.ProducerName

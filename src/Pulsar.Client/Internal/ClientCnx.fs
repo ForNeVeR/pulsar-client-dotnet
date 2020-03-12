@@ -373,7 +373,9 @@ type internal ClientCnx (config: PulsarClientConfiguration,
                     Authoritative = cmd.Authoritative }
                 handleSuccess %cmd.RequestId result
         | XCommandProducerSuccess cmd ->
-            let result = ProducerSuccess { GeneratedProducerName = cmd.ProducerName }
+            let result = ProducerSuccess {
+                GeneratedProducerName = cmd.ProducerName
+                LastSequenceId = cmd.LastSequenceId }
             handleSuccess %cmd.RequestId result
         | XCommandSuccess cmd ->
             handleSuccess %cmd.RequestId Empty

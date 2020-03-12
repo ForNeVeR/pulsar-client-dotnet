@@ -21,6 +21,7 @@ type internal PartitionedTopicMetadata =
 type internal ProducerSuccess =
     {
         GeneratedProducerName: string
+        LastSequenceId: int64
     }
 
 type internal LookupTopicResult =
