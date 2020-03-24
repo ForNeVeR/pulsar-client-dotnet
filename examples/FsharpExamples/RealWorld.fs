@@ -34,7 +34,7 @@ let internal processMessages<'a> (consumer: IConsumer, logger: ILogger, f: Messa
                 logger.LogError(ex, "ProcessMessages failed for {0}", consumer.Topic)
    }
     
-let internal sendMessage (producer: IProducer, logger: ILogger, message: byte[]) =
+let internal sendMessage (producer: IProducer<byte[]>, logger: ILogger, message: byte[]) =
     task {
         try
             let! messageId = producer.SendAsync(message)
@@ -57,7 +57,7 @@ let runRealWorld (logger: ILogger) =
     task {
 
         let! producer =
-            ProducerBuilder(client)
+            ProducerBuilder<byte[]>(client)
                 .Topic(topicName)
                 .EnableBatching(false)
                 .CreateAsync()
@@ -83,7 +83,7 @@ let runRealWorld (logger: ILogger) =
         
         cts.Dispose()
         do! Task.Delay(200);// wait for pending acknowledgments to complete
-        do! consumer.CloseAsync();
-        do! producer.CloseAsync()
+        do! consumer.CloseAsync()
+        do! producer.DisposeAsync()
         do! client.CloseAsync()
     }

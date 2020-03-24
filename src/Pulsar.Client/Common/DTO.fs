@@ -223,8 +223,9 @@ type Messages internal(maxNumberOfMessages: int, maxSizeOfMessages: int64) =
 /// <summary>
 ///     Message builder that constructs a message to be published through a producer.
 /// </summary>
-type MessageBuilder =
-    val Value: byte[]
+type MessageBuilder<'T> =
+    val Value: 'T
+    val internal Payload: byte[]
     val Key: MessageKey
     val Properties: IReadOnlyDictionary<string, string>
     val DeliverAt: Nullable<int64>
@@ -232,14 +233,14 @@ type MessageBuilder =
     /// <summary>
     ///     Constructs <see cref="Pulsar.Client.Common.MessageBuilder" />
     /// </summary>
-    /// <param name="value">Message data serialized to array of bytes.</param>
+    /// <param name="value">Message data</param>
     /// <param name="properties">The readonly dictionary with message properties.</param>
     /// <param name="deliverAt">Unix timestamp in milliseconds after which message should be delivered to consumer(s).</param>
     /// <remarks>
     ///     This <paramref name="deliverAt" /> timestamp must be expressed as unix time milliseconds based on UTC.
     ///     For example: <code>DateTimeOffset.UtcNow.AddSeconds(2.0).ToUnixTimeMilliseconds()</code>.
     /// </remarks>
-    new (value : byte[],
+    new (value : 'T,
             [<Optional; DefaultParameterValue(null:string)>] key : string,
             [<Optional; DefaultParameterValue(null:IReadOnlyDictionary<string, string>)>] properties : IReadOnlyDictionary<string, string>,
             [<Optional; DefaultParameterValue(Nullable():Nullable<int64>)>] deliverAt : Nullable<int64>) =
@@ -248,6 +249,7 @@ type MessageBuilder =
                 Key = if isNull key then %"" else %key
                 Properties = if isNull properties then EmptyProps else properties
                 DeliverAt = deliverAt
+                Payload = [||] //TODO!!!
             }
         
 type internal WriterStream = Stream
@@ -260,23 +262,23 @@ type internal Connection =
     }
 type internal RedeliverSet = HashSet<MessageId>
 
-type internal SingleCallback = MessageBuilder * TaskCompletionSource<MessageId>
-type internal BatchCallback = BatchDetails * MessageBuilder * TaskCompletionSource<MessageId>
-type internal PendingCallback = 
-    | SingleCallback of SingleCallback
-    | BatchCallbacks of BatchCallback[]
+type internal SingleCallback<'T> = MessageBuilder<'T> * TaskCompletionSource<MessageId>
+type internal BatchCallback<'T> = BatchDetails * MessageBuilder<'T> * TaskCompletionSource<MessageId>
+type internal PendingCallback<'T> = 
+    | SingleCallback of SingleCallback<'T>
+    | BatchCallbacks of BatchCallback<'T>[]
 
-type internal PendingMessage =
+type internal PendingMessage<'T> =
     {
         CreatedAt: DateTime
         SequenceId: SequenceId
         Payload: Payload
-        Callback : PendingCallback
+        Callback : PendingCallback<'T>
     }
 
-type internal BatchItem =
+type internal BatchItem<'T> =
     {
-        Message: MessageBuilder
+        Message: MessageBuilder<'T>
         Tcs : TaskCompletionSource<MessageId>
     }
 
@@ -338,21 +340,7 @@ type AuthData =
         Bytes: byte[]
     }
     static member INIT_AUTH_DATA = Encoding.UTF8.GetBytes("PulsarAuthInit")
-
-type internal ProducerMessage =
-    | ConnectionOpened
-    | ConnectionFailed of exn
-    | ConnectionClosed of obj // ClientCnx
-    | AckReceived of SendReceipt
-    | BeginSendMessage of MessageBuilder * AsyncReplyChannel<TaskCompletionSource<MessageId>>
-    | SendMessage of PendingMessage
-    | RecoverChecksumError of SequenceId
-    | Terminated
-    | Close of AsyncReplyChannel<Task>
-    | StoreBatchItem of MessageBuilder * AsyncReplyChannel<TaskCompletionSource<MessageId>>
-    | SendBatchTick
-    | SendTimeoutTick
-
+    
 type internal ConsumerMessage =
     | ConnectionOpened
     | ConnectionFailed of exn

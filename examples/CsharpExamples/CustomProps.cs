@@ -19,7 +19,7 @@ namespace CsharpExamples
                 .ServiceUrl(serviceUrl)
                 .Build();
 
-            var producer = await new ProducerBuilder(client)
+            var producer = await new ProducerBuilder<byte[]>(client)
                 .Topic(topicName)
                 .CreateAsync();
 
@@ -29,7 +29,7 @@ namespace CsharpExamples
                 .SubscribeAsync();
 
             var payload = Encoding.UTF8.GetBytes($"Sent from C# at '{DateTime.Now}'");
-            var messageId = await producer.SendAsync(new MessageBuilder(payload, "C#", new Dictionary<string, string> { ["1"] = "one" }));
+            var messageId = await producer.SendAsync(new MessageBuilder<byte[]>(payload, "C#", new Dictionary<string, string> { ["1"] = "one" }));
             Console.WriteLine($"MessageId is: '{messageId}'");
 
             var message = await consumer.ReceiveAsync();

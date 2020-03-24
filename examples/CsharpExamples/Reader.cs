@@ -18,7 +18,7 @@ namespace CsharpExamples
                 .ServiceUrl(serviceUrl)
                 .Build();
 
-            var producer = await new ProducerBuilder(client)
+            var producer = await new ProducerBuilder<byte[]>(client)
                 .Topic(topicName)
                 .CreateAsync();
 

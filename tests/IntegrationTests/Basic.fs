@@ -337,7 +337,7 @@ let tests =
 
             do! consumer1.CloseAsync() |> Async.AwaitTask
             Expect.throwsT2<AlreadyClosedException> (fun () -> consumer1.ReceiveAsync().Result |> ignore) |> ignore
-            do! producer1.CloseAsync() |> Async.AwaitTask
+            do! producer1.DisposeAsync().AsTask() |> Async.AwaitTask
             Expect.throwsT2<AlreadyClosedException> (fun () -> producer1.SendAndForgetAsync([||]).Result |> ignore) |> ignore
             do! client.CloseAsync() |> Async.AwaitTask
             Expect.throwsT2<AlreadyClosedException> (fun () -> consumer2.UnsubscribeAsync().Result |> ignore) |> ignore
@@ -359,7 +359,7 @@ let tests =
             let sw = Stopwatch()
 
             let! producer =
-                ProducerBuilder(client)
+                ProducerBuilder<byte[]>(client)
                     .Topic(topicName).EnableBatching(false)
                     .ProducerName(producerName)
                     .CreateAsync() |> Async.AwaitTask

@@ -15,9 +15,9 @@ type PulsarClientState =
     | Closed
 
 type PulsarClientMessage =
-    | RemoveProducer of IProducer
+    | RemoveProducer of IAsyncDisposable // IProducer
     | RemoveConsumer of IConsumer
-    | AddProducer of IProducer
+    | AddProducer of IAsyncDisposable // IProducer
     | AddConsumer of IConsumer
     | Close of AsyncReplyChannel<Task>
     | Stop
@@ -26,7 +26,7 @@ type PulsarClient(config: PulsarClientConfiguration) as this =
 
     let connectionPool = ConnectionPool(config)
     let lookupService = BinaryLookupService(config, connectionPool)
-    let producers = HashSet<IProducer>()
+    let producers = HashSet<IAsyncDisposable>()
     let consumers = HashSet<IConsumer>()
     let mutable clientState = Active
 
@@ -68,7 +68,7 @@ type PulsarClient(config: PulsarClientConfiguration) as this =
                     | Active ->
                         Log.Logger.LogInformation("Client closing. URL: {0}", config.ServiceAddresses)
                         this.ClientState <- Closing
-                        let producersTasks = producers |> Seq.map (fun producer -> producer.CloseAsync())
+                        let producersTasks = producers |> Seq.map (fun producer -> task { return! producer.DisposeAsync() } )
                         let consumerTasks = consumers |> Seq.map (fun consumer -> consumer.CloseAsync())
                         task {
                             try
@@ -152,7 +152,7 @@ type PulsarClient(config: PulsarClientConfiguration) as this =
                 return consumer :> IConsumer
         }
 
-    member internal this.CreateProducerAsync (interceptors: ProducerInterceptors) (producerConfig: ProducerConfiguration) =
+    member internal this.CreateProducerAsync<'T> (interceptors: ProducerInterceptors<'T>) (producerConfig: ProducerConfiguration) =
         task {
             checkIfActive()
             Log.Logger.LogDebug("CreateProducerAsync started")

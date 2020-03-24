@@ -11,7 +11,7 @@ namespace CsharpExamples
 {
     internal class RealWorld
     {
-        internal static async Task SendMessage(IProducer producer, ILogger logger, byte[] message)
+        internal static async Task SendMessage(IProducer<byte[]> producer, ILogger logger, byte[] message)
         {
             try
             {
@@ -68,7 +68,7 @@ namespace CsharpExamples
                 .ServiceUrl(serviceUrl)
                 .Build();
 
-            var producer = await new ProducerBuilder(client)
+            var producer = await new ProducerBuilder<byte[]>(client)
                 .Topic(topicName)
                 .EnableBatching(false)
                 .CreateAsync();
@@ -94,7 +94,7 @@ namespace CsharpExamples
             cts.Dispose();
             await Task.Delay(200);// wait for pending acknowledgments to complete
             await consumer.CloseAsync();
-            await producer.CloseAsync();
+            await producer.DisposeAsync();
             await client.CloseAsync();
         }
     }

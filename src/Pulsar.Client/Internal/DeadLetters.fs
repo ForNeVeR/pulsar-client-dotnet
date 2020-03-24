@@ -12,7 +12,7 @@ type internal DeadLettersProcessor
     (policy: DeadLettersPolicy,
      getTopicName: unit -> string,
      getSubscriptionNameName: unit -> string,
-     createProducer: string -> Task<IProducer>) =
+     createProducer: string -> Task<IProducer<byte[]>>) =
 
     let store = Dictionary<MessageId, Message>()
 
@@ -22,11 +22,11 @@ type internal DeadLettersProcessor
         else
             (sprintf "%s-%s-DLQ" (getTopicName()) (getSubscriptionNameName()))
 
-    let producer = lazy (
+    let producer: Lazy<Task<IProducer<byte[]>>> = lazy (
         createProducer topicName
     )
 
-    let sendMessage (builder : MessageBuilder) =
+    let sendMessage (builder: MessageBuilder<byte[]>) =
         task {
             let! p = producer.Value
             let! _ = p.SendAsync(builder)
@@ -49,7 +49,7 @@ type internal DeadLettersProcessor
                 | true, message ->
                     Log.Logger.LogInformation("DeadLetter processing topic: {0}, messageId: {1}", topicName, messageId)
                     try
-                        let mb = MessageBuilder(message.Data, message.Key, message.Properties)
+                        let mb = MessageBuilder<byte[]>(message.Data, message.Key, message.Properties)
                         do! sendMessage mb
                         do! acknowledge messageId
                         return true

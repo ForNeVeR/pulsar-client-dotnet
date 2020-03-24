@@ -11,7 +11,6 @@ open Microsoft.Extensions.Logging
 open System.IO
 open ProtoBuf
 open pulsar.proto
-open System.Linq
 open System.Threading
 
 type internal ConsumerImpl (consumerConfig: ConsumerConfiguration, clientConfig: PulsarClientConfiguration, connectionPool: ConnectionPool,
@@ -427,7 +426,7 @@ type internal ConsumerImpl (consumerConfig: ConsumerConfiguration, clientConfig:
                     match connectionHandler.ConnectionState with
                     | Ready clientCnx ->
                         Log.Logger.LogInformation("{0} starting subscribe to topic {1}", prefix, consumerConfig.Topic)
-                        clientCnx.AddConsumer consumerId this.Mb
+                        clientCnx.AddConsumer(consumerId, this.Mb)
                         let requestId = Generators.getNextRequestId()
                         startMessageId <- clearReceiverQueue()
                         clearDeadLetters()

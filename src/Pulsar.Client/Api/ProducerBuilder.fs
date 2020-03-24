@@ -4,7 +4,7 @@ open Pulsar.Client.Common
 open Pulsar.Client.Internal
 open System
 
-type ProducerBuilder private (client: PulsarClient, config: ProducerConfiguration, producerInterceptors: ProducerInterceptors) =
+type ProducerBuilder<'T> private (client: PulsarClient, config: ProducerConfiguration, producerInterceptors: ProducerInterceptors<'T>) =
 
     let verify(config : ProducerConfiguration) =
         let checkValue check config =
@@ -24,10 +24,10 @@ type ProducerBuilder private (client: PulsarClient, config: ProducerConfiguratio
     new(client: PulsarClient) = ProducerBuilder(client, ProducerConfiguration.Default, ProducerInterceptors.Empty)
 
     member private this.With(newConfig: ProducerConfiguration) =
-        ProducerBuilder(client, newConfig, producerInterceptors)
+        ProducerBuilder<'T>(client, newConfig, producerInterceptors)
 
-    member private this.With(newInterceptors: ProducerInterceptors) =
-        ProducerBuilder(client, config, newInterceptors)
+    member private this.With(newInterceptors: ProducerInterceptors<'T>) =
+        ProducerBuilder<'T>(client, config, newInterceptors)
 
     member this.Topic topic =
         { config with
@@ -117,7 +117,7 @@ type ProducerBuilder private (client: PulsarClient, config: ProducerConfiguratio
             HashingScheme = hashingScheme }
         |> this.With
 
-    member this.Intercept ([<ParamArray>] interceptors: IProducerInterceptor array) =
+    member this.Intercept ([<ParamArray>] interceptors: IProducerInterceptor<'T> array) =
         if interceptors.Length = 0 then this
         else
             ProducerInterceptors(Array.append producerInterceptors.Interceptors interceptors)

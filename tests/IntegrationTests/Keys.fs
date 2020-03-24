@@ -65,7 +65,7 @@ let tests =
             let producerName = "PartitionedProducer"
 
             let! producer =
-                ProducerBuilder(client)
+                ProducerBuilder<byte[]>(client)
                     .Topic(topicName)
                     .ProducerName(producerName)
                     .EnableBatching(false)

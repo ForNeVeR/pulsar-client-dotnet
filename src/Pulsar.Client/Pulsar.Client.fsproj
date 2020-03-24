@@ -1,7 +1,7 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <Project Sdk="Microsoft.NET.Sdk" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <PropertyGroup>
-    <TargetFramework>netstandard2.0</TargetFramework>
+    <TargetFramework>netstandard2.1</TargetFramework>
     <TargetsForTfmSpecificBuildOutput>$(TargetsForTfmSpecificBuildOutput);CopyProjectReferencesToPackage</TargetsForTfmSpecificBuildOutput>
     <PackageId>Pulsar.Client</PackageId>
     <Title>Pulsar.Client</Title>
@@ -48,6 +48,7 @@
     <Compile Include="Common\NamespaceName.fs" />
     <Compile Include="Api\BatchReceivePolicy.fs" />
     <Compile Include="Api\KeySharedPolicy.fs" />
+    <Compile Include="Api\Schema.fs" />
     <Compile Include="Common\Commands.fs" />
     <Compile Include="Api\AuthenticationDataProvider.fs" />
     <Compile Include="Api\Authentication.fs" />

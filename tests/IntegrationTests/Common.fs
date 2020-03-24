@@ -46,14 +46,14 @@ let getNewClient() =
         .ServiceUrl(pulsarAddress)
         .Build()
 
-let produceMessages (producer: IProducer) number producerName =
+let produceMessages (producer: IProducer<byte[]>) number producerName =
     task {
         for i in [1..number] do
             let! _ = producer.SendAsync(Encoding.UTF8.GetBytes(sprintf "Message #%i Sent from %s on %s" i producerName (DateTime.Now.ToLongTimeString()) ))
             ()
     }
 
-let produceMessagesWithProps (producer: IProducer) number producerName =
+let produceMessagesWithProps (producer: IProducer<byte[]>) number producerName =
     task {
         for i in [1..number] do
             let payload = Encoding.UTF8.GetBytes(sprintf "Message #%i Sent from %s on %s" i producerName (DateTime.Now.ToLongTimeString()) )
@@ -63,7 +63,7 @@ let produceMessagesWithProps (producer: IProducer) number producerName =
             ()
     }
 
-let produceMessagesWithSameKey (producer: IProducer) number key producerName =
+let produceMessagesWithSameKey (producer: IProducer<byte[]>) number key producerName =
     task {
         for i in [1..number] do
             let payload = Encoding.UTF8.GetBytes(sprintf "Message #%i Sent from %s on %s" i producerName (DateTime.Now.ToLongTimeString()) )
@@ -77,21 +77,21 @@ let generateMessages number producerName =
             yield sprintf "Message #%i Sent from %s on %s" i producerName (DateTime.Now.ToLongTimeString())
     |]
 
-let producePredefinedMessages (producer: IProducer) (messages: string[]) =
+let producePredefinedMessages (producer: IProducer<byte[]>) (messages: string[]) =
     task {
         for msg in messages do
             let! _ = producer.SendAsync(Encoding.UTF8.GetBytes(msg))
             ()
     }
 
-let fastProduceMessages (producer: IProducer) number producerName =
+let fastProduceMessages (producer: IProducer<byte[]>) number producerName =
     task {
         for i in [1..number] do
             let! _ = producer.SendAndForgetAsync(Encoding.UTF8.GetBytes(sprintf "Message #%i Sent from %s on %s" i producerName (DateTime.Now.ToLongTimeString()) ))
             ()
     }
 
-let fastProduceMessagesWithSameKey (producer: IProducer) number key producerName =
+let fastProduceMessagesWithSameKey (producer: IProducer<byte[]>) number key producerName =
     task {
         for i in [1..number] do
             let payload = Encoding.UTF8.GetBytes(sprintf "Message #%i Sent from %s on %s" i producerName (DateTime.Now.ToLongTimeString()) )
@@ -99,7 +99,7 @@ let fastProduceMessagesWithSameKey (producer: IProducer) number key producerName
             ()
     }
 
-let createSendAndWaitTasks (producer: IProducer) number producerName =
+let createSendAndWaitTasks (producer: IProducer<byte[]>) number producerName =
     let createTask taskNumber =
         let message = sprintf "Message #%i Sent from %s on %s" taskNumber producerName (DateTime.Now.ToLongTimeString())
         let messageBytes = Encoding.UTF8.GetBytes(message)

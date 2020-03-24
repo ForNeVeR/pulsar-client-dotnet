@@ -22,7 +22,7 @@ let main _ =
     runCustomProps().Wait()
     runReader().Wait()
     runRealWorld(PulsarClient.Logger).Wait()
-
+    
     printfn "Example ended. Press any key to exit"
     Console.ReadKey() |> ignore
 

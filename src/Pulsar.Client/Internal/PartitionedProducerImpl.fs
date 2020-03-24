@@ -22,11 +22,11 @@ type internal PartitionedConnectionState =
     | Closing
     | Closed
 
-type internal PartitionedProducerImpl private (producerConfig: ProducerConfiguration, clientConfig: PulsarClientConfiguration, connectionPool: ConnectionPool,
-                                      numPartitions: int, lookup: BinaryLookupService, interceptors: ProducerInterceptors, cleanup: PartitionedProducerImpl -> unit) as this =
+type internal PartitionedProducerImpl<'T> private (producerConfig: ProducerConfiguration, clientConfig: PulsarClientConfiguration, connectionPool: ConnectionPool,
+                                      numPartitions: int, lookup: BinaryLookupService, interceptors: ProducerInterceptors<'T>, cleanup: PartitionedProducerImpl<'T> -> unit) as this =
     let producerId = Generators.getNextProducerId()
     let prefix = sprintf "p/producer(%u, %s)" %producerId producerConfig.ProducerName
-    let producers = ResizeArray<IProducer>(numPartitions)
+    let producers = ResizeArray<IProducer<'T>>(numPartitions)
     let producerCreatedTsc = TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously)
     let maxPendingMessages = Math.Min(producerConfig.MaxPendingMessages, producerConfig.MaxPendingMessagesAcrossPartitions / numPartitions)
     let mutable connectionState = PartitionedConnectionState.Uninitialized
@@ -93,7 +93,7 @@ type internal PartitionedProducerImpl private (producerConfig: ProducerConfigura
                         Log.Logger.LogError(ex, "{0} could not create", prefix)
                         do! producerTasks
                             |> Seq.filter (fun t -> t.Status = TaskStatus.RanToCompletion)
-                            |> Seq.map (fun t -> t.Result.CloseAsync())
+                            |> Seq.map (fun t -> task { return! t.Result.DisposeAsync() })
                             |> Task.WhenAll
                             |> Async.AwaitTask
                             |> Async.Ignore
@@ -108,7 +108,7 @@ type internal PartitionedProducerImpl private (producerConfig: ProducerConfigura
                         channel.Reply(Task.FromResult())
                     | _ ->
                         this.ConnectionState <- Closing
-                        let producersTasks = producers |> Seq.map(fun producer -> producer.CloseAsync())
+                        let producersTasks = producers |> Seq.map(fun producer -> task { return! producer.DisposeAsync() })
                         task {
                             try
                                 let! _ = Task.WhenAll producersTasks
@@ -154,7 +154,7 @@ type internal PartitionedProducerImpl private (producerConfig: ProducerConfigura
                             with ex ->
                                 do! producerTasks
                                     |> Seq.filter (fun t -> t.Status = TaskStatus.RanToCompletion)
-                                    |> Seq.map (fun t -> t.Result.CloseAsync())
+                                    |> Seq.map (fun t -> task { return! t.Result.DisposeAsync() })
                                     |> Task.WhenAll
                                     |> Async.AwaitTask
                                     |> Async.Ignore
@@ -182,11 +182,11 @@ type internal PartitionedProducerImpl private (producerConfig: ProducerConfigura
             timer.Start()
 
     override this.Equals producer =
-        producerId = (producer :?> IProducer).ProducerId
+        producerId = (producer :?> IProducer<'T>).ProducerId
 
     override this.GetHashCode () = int producerId
 
-    member private this.ChoosePartitionIfActive (message: MessageBuilder) =
+    member private this.ChoosePartitionIfActive (message: MessageBuilder<'T>) =
         match this.ConnectionState with
         | Closing | Closed ->
             raise (AlreadyClosedException(prefix + " already closed"))
@@ -211,44 +211,34 @@ type internal PartitionedProducerImpl private (producerConfig: ProducerConfigura
        }
 
     static member Init(producerConfig: ProducerConfiguration, clientConfig: PulsarClientConfiguration, connectionPool: ConnectionPool,
-                        partitions: int, lookup: BinaryLookupService, interceptors:ProducerInterceptors, cleanup: PartitionedProducerImpl -> unit) =
+                        partitions: int, lookup: BinaryLookupService, interceptors:ProducerInterceptors<'T>, cleanup: PartitionedProducerImpl<'T> -> unit) =
         task {
             let producer = PartitionedProducerImpl(producerConfig, clientConfig, connectionPool, partitions, lookup, interceptors, cleanup)
             do! producer.InitInternal()
-            return producer :> IProducer
+            return producer :> IProducer<'T>
         }
 
-    interface IProducer with
+    interface IProducer<'T> with
 
-        member this.CloseAsync() =
-            task {
-                match this.ConnectionState with
-                | Closing | Closed ->
-                    return ()
-                | _ ->
-                    let! result = mb.PostAndAsyncReply(Close)
-                    return! result
-            }
-
-        member this.SendAndForgetAsync (message: byte[]) =
+        member this.SendAndForgetAsync (message: 'T) =
             task {
                 let partition = this.ChoosePartitionIfActive(MessageBuilder(message))
                 return! producers.[partition].SendAndForgetAsync(message)
             }
 
-        member this.SendAndForgetAsync (message: MessageBuilder) =
+        member this.SendAndForgetAsync (message: MessageBuilder<'T>) =
             task {
                 let partition = this.ChoosePartitionIfActive(message)
                 return! producers.[partition].SendAndForgetAsync(message)
             }
 
-        member this.SendAsync (message: byte[]) =
+        member this.SendAsync (message: 'T) =
             task {
                 let partition = this.ChoosePartitionIfActive(MessageBuilder(message))
                 return! producers.[partition].SendAsync(message)
             }
 
-        member this.SendAsync (message: MessageBuilder) =
+        member this.SendAsync (message: MessageBuilder<'T>) =
             task {
                 let partition = this.ChoosePartitionIfActive(message)
                 return! producers.[partition].SendAsync(message)
@@ -257,3 +247,15 @@ type internal PartitionedProducerImpl private (producerConfig: ProducerConfigura
         member this.ProducerId = producerId
 
         member this.Topic = %producerConfig.Topic.CompleteTopicName
+        
+    interface IAsyncDisposable with
+        
+        member this.DisposeAsync() =
+            task {
+                match this.ConnectionState with
+                | Closing | Closed ->
+                    return ()
+                | _ ->
+                    let! result = mb.PostAndAsyncReply(Close)
+                    return! result
+            } |> ValueTask

@@ -12,7 +12,7 @@ open Pulsar.Client.IntegrationTests.Common
 open FSharp.UMX
 
 type ConsumerInterceptorBeforeConsume() =
-    member val BeforeMessages = ResizeArray<MessageBuilder>() with get
+    member val BeforeMessages = ResizeArray<MessageBuilder<byte[]>>() with get
 
     interface IConsumerInterceptor with
         member this.Close() = ()

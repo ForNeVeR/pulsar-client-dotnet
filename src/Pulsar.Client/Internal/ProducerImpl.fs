@@ -12,15 +12,29 @@ open System.Collections.Generic
 open System.Timers
 open System.IO
 
-type internal ProducerImpl private (producerConfig: ProducerConfiguration, clientConfig: PulsarClientConfiguration, connectionPool: ConnectionPool,
-                           partitionIndex: int, lookup: BinaryLookupService, interceptors: ProducerInterceptors, cleanup: ProducerImpl -> unit) as this =
+type internal ProducerMessage<'T> =
+    | ConnectionOpened
+    | ConnectionFailed of exn
+    | ConnectionClosed of ClientCnx
+    | AckReceived of SendReceipt
+    | BeginSendMessage of MessageBuilder<'T> * AsyncReplyChannel<TaskCompletionSource<MessageId>>
+    | SendMessage of PendingMessage<'T>
+    | RecoverChecksumError of SequenceId
+    | TopicTerminatedError
+    | Close of AsyncReplyChannel<Task>
+    | StoreBatchItem of MessageBuilder<'T> * AsyncReplyChannel<TaskCompletionSource<MessageId>>
+    | SendBatchTick
+    | SendTimeoutTick
+
+type internal ProducerImpl<'T> private (producerConfig: ProducerConfiguration, clientConfig: PulsarClientConfiguration, connectionPool: ConnectionPool,
+                           partitionIndex: int, lookup: BinaryLookupService, interceptors: ProducerInterceptors<'T>, cleanup: ProducerImpl<'T> -> unit) as this =
     let producerId = Generators.getNextProducerId()
 
     let prefix = sprintf "producer(%u, %s, %i)" %producerId producerConfig.ProducerName partitionIndex
     let producerCreatedTsc = TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously)
     let mutable maxMessageSize = Commands.DEFAULT_MAX_MESSAGE_SIZE
 
-    let pendingMessages = Queue<PendingMessage>()
+    let pendingMessages = Queue<PendingMessage<'T>>()
 
     let compressionCodec = CompressionCodec.create producerConfig.CompressionType
 
@@ -50,9 +64,9 @@ type internal ProducerImpl private (producerConfig: ProducerConfiguration, clien
     let batchMessageContainer =
         match producerConfig.BatchBuilder with
         | BatchBuilder.Default ->
-            DefaultBatchMessageContainer(prefix, producerConfig) :> MessageContainer
+            DefaultBatchMessageContainer(prefix, producerConfig) :> MessageContainer<'T>
         | BatchBuilder.KeyBased ->
-            KeyBasedBatchMessageContainer(prefix, producerConfig) :> MessageContainer
+            KeyBasedBatchMessageContainer(prefix, producerConfig) :> MessageContainer<'T>
         | _ -> failwith "Unknown BatchBuilder type"
 
     let failPendingMessage msg (ex: exn) =
@@ -101,7 +115,7 @@ type internal ProducerImpl private (producerConfig: ProducerConfiguration, clien
         else
             producerCreatedTsc.TrySetResult() |> ignore
 
-    let verifyIfLocalBufferIsCorrupted (msg: PendingMessage) =
+    let verifyIfLocalBufferIsCorrupted (msg: PendingMessage<'T>) =
         task {
             use stream = MemoryStreamManager.GetStream()
             use reader = new BinaryReader(stream)
@@ -116,13 +130,13 @@ type internal ProducerImpl private (producerConfig: ProducerConfiguration, clien
             return checkSum <> computedCheckSum
         }
 
-    let createMessageMetadata (message : MessageBuilder) (numMessagesInBatch: int option) =
+    let createMessageMetadata (message : MessageBuilder<'a>) (numMessagesInBatch: int option) =
         let metadata =
             MessageMetadata (
                 SequenceId = %Generators.getNextSequenceId(),
                 PublishTime = (DateTimeOffset.UtcNow.ToUnixTimeSeconds() |> uint64),
                 ProducerName = producerConfig.ProducerName,
-                UncompressedSize = (message.Value.Length |> uint32)
+                UncompressedSize = (message.Payload.Length |> uint32)
             )
         if protoCompressionType <> pulsar.proto.CompressionType.None then
             metadata.Compression <- protoCompressionType
@@ -139,11 +153,12 @@ type internal ProducerImpl private (producerConfig: ProducerConfiguration, clien
 
         metadata
 
-    let sendOneBatch (batchPayload: byte[], batchCallbacks: BatchCallback[]) =
+    let sendOneBatch (batchPayload: byte[], batchCallbacks: BatchCallback<'T>[]) =
         let batchSize = batchCallbacks.Length
-        let metadata = createMessageMetadata (MessageBuilder batchPayload) (Some batchSize)
+        let msgBuilder = MessageBuilder(batchPayload)
+        let metadata = createMessageMetadata msgBuilder (Some batchSize)
         let sequenceId = %metadata.SequenceId
-        let encodedBatchPayload = compressionCodec.Encode batchPayload
+        let encodedBatchPayload = compressionCodec.Encode msgBuilder.Payload
         if (encodedBatchPayload.Length > maxMessageSize) then
             batchCallbacks
             |> Seq.iter (fun (_, message, tcs) ->
@@ -159,7 +174,7 @@ type internal ProducerImpl private (producerConfig: ProducerConfiguration, clien
                 CreatedAt = DateTime.Now
             })
 
-    let canAddToCurrentBatch (msg: MessageBuilder) =
+    let canAddToCurrentBatch (msg: MessageBuilder<'T>) =
         batchMessageContainer.HaveEnoughSpace(msg)
 
     let batchMessageAndSend() =
@@ -183,8 +198,15 @@ type internal ProducerImpl private (producerConfig: ProducerConfiguration, clien
         connectionHandler.Close()
         cleanup(this)
         Log.Logger.LogInformation("{0} stopped", prefix)
+        
+    let producerOperations = {
+        AckReceived = fun (sendReceipt) -> this.Mb.Post(AckReceived sendReceipt)
+        TopicTerminatedError = fun () -> this.Mb.Post(TopicTerminatedError)
+        RecoverChecksumError = fun (seqId) -> this.Mb.Post(RecoverChecksumError seqId)
+        ConnectionClosed = fun (clientCnx) -> this.Mb.Post(ConnectionClosed clientCnx)
+    }
 
-    let mb = MailboxProcessor<ProducerMessage>.Start(fun inbox ->
+    let mb = MailboxProcessor<ProducerMessage<'T>>.Start(fun inbox ->
 
         let rec loop () =
             async {
@@ -197,7 +219,7 @@ type internal ProducerImpl private (producerConfig: ProducerConfiguration, clien
                     | Ready clientCnx ->
                         Log.Logger.LogInformation("{0} starting register to topic {1}", prefix, producerConfig.Topic)
                         updateMaxMessageSize clientCnx.MaxMessageSize
-                        clientCnx.AddProducer producerId this.Mb
+                        clientCnx.AddProducer(producerId, producerOperations)
                         let requestId = Generators.getNextRequestId()
                         try
                             let payload = Commands.newProducer producerConfig.Topic.CompleteTopicName producerConfig.ProducerName producerId requestId
@@ -243,7 +265,6 @@ type internal ProducerImpl private (producerConfig: ProducerConfiguration, clien
                 | ProducerMessage.ConnectionClosed clientCnx ->
 
                     Log.Logger.LogDebug("{0} ConnectionClosed", prefix)
-                    let clientCnx = clientCnx :?> ClientCnx
                     connectionHandler.ConnectionClosed clientCnx
                     clientCnx.RemoveProducer(producerId)
                     return! loop ()
@@ -270,7 +291,7 @@ type internal ProducerImpl private (producerConfig: ProducerConfiguration, clien
                             Log.Logger.LogDebug("{0} Max batch container size exceeded", prefix)
                             batchMessageAndSend()
                     else
-                       Log.Logger.LogDebug("{0} Closing out batch to accommodate large message with size {1}", prefix, batchItem.Message.Value.Length)
+                       Log.Logger.LogDebug("{0} Closing out batch to accommodate large message with size {1}", prefix, batchItem.Message.Payload.Length)
                        batchMessageAndSend()
                        batchMessageContainer.Add(batchItem) |> ignore
                     channel.Reply(tcs)
@@ -280,7 +301,7 @@ type internal ProducerImpl private (producerConfig: ProducerConfiguration, clien
 
                     Log.Logger.LogDebug("{0} BeginSendMessage", prefix)
                     let metadata = createMessageMetadata message None
-                    let encodedMessage = compressionCodec.Encode message.Value
+                    let encodedMessage = compressionCodec.Encode message.Payload
                     let tcs = TaskCompletionSource(TaskContinuationOptions.RunContinuationsAsynchronously)
                         
                     if (encodedMessage.Length > maxMessageSize) then
@@ -372,7 +393,7 @@ type internal ProducerImpl private (producerConfig: ProducerConfiguration, clien
                         Log.Logger.LogDebug("{0} Got send failure for timed out seqId {1}", prefix, sequenceId)
                     return! loop ()
 
-                | ProducerMessage.Terminated ->
+                | ProducerMessage.TopicTerminatedError ->
 
                     match connectionHandler.ConnectionState with
                     | Closed | Terminated -> ()
@@ -436,20 +457,20 @@ type internal ProducerImpl private (producerConfig: ProducerConfiguration, clien
     do mb.Error.Add(fun ex -> Log.Logger.LogCritical(ex, "{0} mailbox failure", prefix))
     do startSendTimeoutTimer()
 
-    member private this.CanAddToBatch (message : MessageBuilder) =
+    member private this.CanAddToBatch (message : MessageBuilder<'T>) =
         producerConfig.BatchingEnabled && not message.DeliverAt.HasValue
 
-    member private this.SendMessage (message : MessageBuilder) =
+    member private this.SendMessage (message : MessageBuilder<'T>) =
         let interceptMsg = interceptors.BeforeSend(this, message)            
         if this.CanAddToBatch(interceptMsg) then
             mb.PostAndAsyncReply(fun channel -> StoreBatchItem (interceptMsg, channel))
         else
             mb.PostAndAsyncReply(fun channel -> BeginSendMessage (interceptMsg, channel))
 
-    member private this.Mb with get(): MailboxProcessor<ProducerMessage> = mb
+    member private this.Mb with get(): MailboxProcessor<ProducerMessage<'T>> = mb
 
     override this.Equals producer =
-        producerId = (producer :?> IProducer).ProducerId
+        producerId = (producer :?> IProducer<'T>).ProducerId
 
     override this.GetHashCode () = int producerId
 
@@ -460,48 +481,36 @@ type internal ProducerImpl private (producerConfig: ProducerConfiguration, clien
        }
 
     static member Init(producerConfig: ProducerConfiguration, clientConfig: PulsarClientConfiguration, connectionPool: ConnectionPool,
-                       partitionIndex: int, lookup: BinaryLookupService, interceptors: ProducerInterceptors, cleanup: ProducerImpl -> unit) =
+                       partitionIndex: int, lookup: BinaryLookupService, interceptors: ProducerInterceptors<'T>, cleanup: ProducerImpl<'T> -> unit) =
         task {
             let producer = ProducerImpl(producerConfig, clientConfig, connectionPool, partitionIndex, lookup, interceptors, cleanup)
             do! producer.InitInternal()
-            return producer :> IProducer
+            return producer :> IProducer<'T>
         }
 
-    interface IProducer with
-
-        member this.CloseAsync() =
-            task {
-                interceptors.Close()
-                match connectionHandler.ConnectionState with
-                | Closing | Closed ->
-                    return ()
-                | _ ->
-                    let! result = mb.PostAndAsyncReply(ProducerMessage.Close)
-                    return! result
-            }
-
-        member this.SendAndForgetAsync (message: byte[]) =
+    interface IProducer<'T> with
+        member this.SendAndForgetAsync (message: 'T) =
             task {
                 connectionHandler.CheckIfActive() |> throwIfNotNull
                 let! _ = this.SendMessage (MessageBuilder(message))
                 return ()
             }
 
-        member this.SendAndForgetAsync (message: MessageBuilder) =
+        member this.SendAndForgetAsync (message: MessageBuilder<'T>) =
             task {
                 connectionHandler.CheckIfActive() |> throwIfNotNull
                 let! _ = this.SendMessage message
                 return ()
             }
 
-        member this.SendAsync (message: byte[]) =
+        member this.SendAsync (message: 'T) =
             task {
                 connectionHandler.CheckIfActive() |> throwIfNotNull
                 let! tcs = this.SendMessage (MessageBuilder(message))
                 return! tcs.Task
             }
 
-        member this.SendAsync (message: MessageBuilder) =
+        member this.SendAsync (message: MessageBuilder<'T>) =
             task {
                 connectionHandler.CheckIfActive() |> throwIfNotNull
                 let! tcs = this.SendMessage message
@@ -511,3 +520,16 @@ type internal ProducerImpl private (producerConfig: ProducerConfiguration, clien
         member this.ProducerId = producerId
 
         member this.Topic = %producerConfig.Topic.CompleteTopicName
+        
+    interface IAsyncDisposable with
+        
+        member this.DisposeAsync() =
+            task {
+                interceptors.Close()
+                match connectionHandler.ConnectionState with
+                | Closing | Closed ->
+                    return ()
+                | _ ->
+                    let! result = mb.PostAndAsyncReply(ProducerMessage.Close)
+                    return! result
+            } |> ValueTask

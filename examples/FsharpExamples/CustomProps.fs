@@ -22,7 +22,7 @@ let runCustomProps () =
     task {
 
         let! producer =
-            ProducerBuilder(client)
+            ProducerBuilder<byte[]>(client)
                 .Topic(topicName)
                 .CreateAsync()
 

@@ -80,7 +80,7 @@ let tests =
                     .CreateAsync()
 
             do! produceMessages producer numberOfMessages producerName
-            do! producer.CloseAsync()
+            do! producer.DisposeAsync()
 
             let! reader =
                 ReaderBuilder(client)
@@ -137,7 +137,7 @@ let tests =
             Log.Debug("msgId1 is {0}", msgId1)
             let! msgId2 = producer.SendAsync(Encoding.UTF8.GetBytes(sprintf "Message #2 Sent from %s on %s" producerName (DateTime.Now.ToLongTimeString()) ))
             Log.Debug("msgId2 is {0}", msgId2)
-            do! producer.CloseAsync()
+            do! producer.DisposeAsync()
 
             let! reader =
                 ReaderBuilder(client)

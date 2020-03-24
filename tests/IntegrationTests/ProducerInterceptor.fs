@@ -12,8 +12,8 @@ open Pulsar.Client.IntegrationTests.Common
 open FSharp.UMX
 
 type ProducerInterceptorEligible() =
-    member val BeforeMessages = ResizeArray<MessageBuilder>() with get
-    interface IProducerInterceptor with
+    member val BeforeMessages = ResizeArray<MessageBuilder<byte[]>>() with get
+    interface IProducerInterceptor<byte[]> with
         member this.Close() = ()
         
         member this.Eligible(message) =
@@ -28,7 +28,7 @@ type ProducerInterceptorEligible() =
         member this.OnSendAcknowledgement(_, _, _, _) = ()
 
 type ProducerInterceptorBefore() =
-    interface IProducerInterceptor with
+    interface IProducerInterceptor<byte[]> with
         member this.Close() = ()
         
         member this.Eligible(_) = true
@@ -43,10 +43,10 @@ type ProducerInterceptorBefore() =
 
 type ProducerInterceptorSendAck() =
     member val Closed = false with get, set
-    member val AckMessages = ResizeArray<MessageBuilder>() with get
+    member val AckMessages = ResizeArray<MessageBuilder<byte[]>>() with get
     member val AckMessageIds = ResizeArray<MessageId>() with get
 
-    interface IProducerInterceptor with
+    interface IProducerInterceptor<byte[]> with
         member this.Close() =
             this.Closed <- true
         
@@ -91,7 +91,7 @@ let tests =
                         for msg in messages do
                             let! msgId = producer.SendAsync(msg)
                             messageIds.Add msgId
-                        do! producer.CloseAsync()
+                        do! producer.DisposeAsync()
                     }:> Task)
 
             let consumerTask =
