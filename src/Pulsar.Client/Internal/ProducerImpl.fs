@@ -26,11 +26,11 @@ type internal ProducerImpl private (producerConfig: ProducerConfiguration, clien
 
     let lastSequenceId = producerConfig.InitialSequenceId |> Option.defaultValue -1L
 
-    let lastPublishedSequenceId = lastSequenceId
+    let mutable lastSequenceIdPublished = lastSequenceId
 
     let lastSequenceIdPushed = lastSequenceId
 
-    let messageIdGenerator =  lastSequenceId + 1L
+    let mutable messageIdGenerator = lastSequenceId + 1L
 
     let protoCompressionType =
         match producerConfig.CompressionType with
@@ -129,7 +129,7 @@ type internal ProducerImpl private (producerConfig: ProducerConfiguration, clien
         let sequenceId =
             if message.SequenceId.HasValue then
                 message.SequenceId.Value
-            else %Generators.getNextSequenceId()
+            else System.Threading.Interlocked.Exchange(&messageIdGenerator, messageIdGenerator + 1L) |> uint64
 
         let metadata =
             MessageMetadata (
@@ -217,10 +217,18 @@ type internal ProducerImpl private (producerConfig: ProducerConfiguration, clien
                             let payload = Commands.newProducer producerConfig.Topic.CompleteTopicName producerConfig.ProducerName producerId requestId
                             let! response = clientCnx.SendAndWaitForReply requestId payload |> Async.AwaitTask
                             let success = response |> PulsarResponseType.GetProducerSuccess
+
                             Log.Logger.LogInformation("{0} registered with name {1}", prefix, success.GeneratedProducerName)
+
                             connectionHandler.ResetBackoff()
+
+                            if messageIdGenerator = 0L && producerConfig.InitialSequenceId |> Option.isNone then
+                                lastSequenceIdPublished <- success.LastSequenceId
+                                messageIdGenerator <- success.LastSequenceId + 1L
+
                             if producerConfig.BatchingEnabled then
                                 startSendBatchTimer()
+
                             resendMessages()
                         with
                         | ex ->
