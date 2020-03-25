@@ -39,7 +39,7 @@ let tests =
             let readerName = "basicReader"
 
             let! producer =
-                ProducerBuilder(client)
+                client.NewProducer()
                     .Topic(topicName)
                     .ProducerName(producerName)
                     .EnableBatching(batching)
@@ -48,7 +48,7 @@ let tests =
             do! produceMessages producer numberOfMessages producerName
 
             let! reader =
-                ReaderBuilder(client)
+                client.NewReader()
                     .Topic(topicName)
                     .ReaderName(readerName)
                     .StartMessageId(MessageId.Earliest)
@@ -73,7 +73,7 @@ let tests =
             let readerName = "producerIdReader"
 
             let! producer =
-                ProducerBuilder(client)
+                client.NewProducer()
                     .Topic(topicName)
                     .ProducerName(producerName)
                     .EnableBatching(batching)
@@ -83,7 +83,7 @@ let tests =
             do! producer.DisposeAsync()
 
             let! reader =
-                ReaderBuilder(client)
+                client.NewReader()
                     .Topic(topicName)
                     .ReaderName(readerName + "1")
                     .StartMessageId(MessageId.Earliest)
@@ -93,7 +93,7 @@ let tests =
             do! reader.CloseAsync()
 
             let! reader2 =
-                ReaderBuilder(client)
+                client.NewReader()
                     .Topic(topicName)
                     .ReaderName(readerName + "2")
                     .StartMessageId(result.[0].MessageId)
@@ -102,7 +102,7 @@ let tests =
             Expect.equal "" (numberOfMessages-1) result2.Count
 
             let! reader3 =
-                ReaderBuilder(client)
+                client.NewReader()
                     .Topic(topicName)
                     .ReaderName(readerName + "3")
                     .StartMessageId(result.[0].MessageId)
@@ -127,7 +127,7 @@ let tests =
             let readerName = "producerIdReader"
 
             let! producer =
-                ProducerBuilder(client)
+                client.NewProducer()
                     .Topic(topicName)
                     .ProducerName(producerName)
                     .EnableBatching(batching)
@@ -140,7 +140,7 @@ let tests =
             do! producer.DisposeAsync()
 
             let! reader =
-                ReaderBuilder(client)
+                client.NewReader()
                     .Topic(topicName)
                     .ReaderName(readerName)
                     .StartMessageId(msgId1)

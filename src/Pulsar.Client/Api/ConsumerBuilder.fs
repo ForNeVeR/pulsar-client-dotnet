@@ -3,8 +3,9 @@
 open Pulsar.Client.Common
 open Pulsar.Client.Internal
 open System
+open System.Threading.Tasks
 
-type ConsumerBuilder private (client: PulsarClient, config: ConsumerConfiguration, consumerInterceptors: ConsumerInterceptors) =
+type ConsumerBuilder private (createConsumerAsync, createProducerAsync, config: ConsumerConfiguration, consumerInterceptors: ConsumerInterceptors) =
 
     [<Literal>]
     let MIN_ACK_TIMEOUT_MILLIS = 1000
@@ -38,13 +39,13 @@ type ConsumerBuilder private (client: PulsarClient, config: ConsumerConfiguratio
                     c.KeySharedPolicy.IsSome && c.SubscriptionType <> SubscriptionType.KeyShared
                 ) "KeySharedPolicy must be set with KeyShared subscription")
 
-    new(client: PulsarClient) = ConsumerBuilder(client, ConsumerConfiguration.Default, ConsumerInterceptors.Empty)
+    internal new(createConsumerAsync, сreateProducerAsync) = ConsumerBuilder(createConsumerAsync, сreateProducerAsync, ConsumerConfiguration.Default, ConsumerInterceptors.Empty)
 
     member private this.With(newConfig: ConsumerConfiguration) =
-        ConsumerBuilder(client, newConfig, consumerInterceptors)
+        ConsumerBuilder(createConsumerAsync, createProducerAsync, newConfig, consumerInterceptors)
 
     member private this.With(newInterceptors: ConsumerInterceptors) =
-        ConsumerBuilder(client, config, newInterceptors)
+        ConsumerBuilder(createConsumerAsync, createProducerAsync, config, newInterceptors)
     
     member this.Topic topic =
         { config with
@@ -110,7 +111,6 @@ type ConsumerBuilder private (client: PulsarClient, config: ConsumerConfiguratio
         |> this.With
 
     member this.DeadLettersPolicy (deadLettersPolicy: DeadLettersPolicy) =
-
         let ackTimeoutTickTime =
             if config.AckTimeoutTickTime = TimeSpan.Zero
             then TimeSpan.FromMilliseconds(DEFAULT_ACK_TIMEOUT_MILLIS_FOR_DEAD_LETTER)
@@ -119,7 +119,7 @@ type ConsumerBuilder private (client: PulsarClient, config: ConsumerConfiguratio
         let getTopicName() = config.Topic.ToString()
         let getSubscriptionName() = config.SubscriptionName
         let createProducer deadLetterTopic =
-            ProducerBuilder(client)
+            ProducerBuilder(createProducerAsync, Schema.BYTES)
                 .Topic(deadLetterTopic)
                 .EnableBatching(false) // dead letters are sent one by one anyway
                 .CreateAsync()
@@ -157,7 +157,7 @@ type ConsumerBuilder private (client: PulsarClient, config: ConsumerConfiguratio
             ConsumerInterceptors(Array.append consumerInterceptors.Interceptors interceptors)
             |> this.With
     
-    member this.SubscribeAsync() =
+    member this.SubscribeAsync(): Task<IConsumer> =
         config
         |> verify
-        |> client.SubscribeAsync consumerInterceptors
+        |> createConsumerAsync consumerInterceptors

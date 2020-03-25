@@ -20,12 +20,12 @@ let tests =
             let topicName = "public/default/topic-" + Guid.NewGuid().ToString("N")
 
             let! producer =
-                ProducerBuilder(client)
+                client.NewProducer()
                     .Topic(topicName)
                     .CreateAsync() |> Async.AwaitTask
 
             let! consumer =
-                ConsumerBuilder(client)
+                client.NewConsumer()
                     .Topic(topicName)
                     .SubscriptionName("test-subscription")
                     .ReceiverQueueSize(10)
@@ -55,13 +55,13 @@ let tests =
             let topicName = "public/default/topic-" + Guid.NewGuid().ToString("N")
 
             let! producer =
-                ProducerBuilder(client)
+                client.NewProducer()
                     .Topic(topicName)
                     .EnableBatching(false)
                     .CreateAsync() |> Async.AwaitTask
 
             let! consumer =
-                ConsumerBuilder(client)
+                client.NewConsumer()
                     .Topic(topicName)
                     .SubscriptionName("test-subscription")
                     .ReceiverQueueSize(10)

@@ -26,13 +26,13 @@ let tests =
             let producerName = "PartitionedProducer"
 
             let! producer =
-                ProducerBuilder(client)
+                client.NewProducer()
                     .Topic(topicName)
                     .ProducerName(producerName)
                     .CreateAsync() |> Async.AwaitTask
 
             let! consumer =
-                ConsumerBuilder(client)
+                client.NewConsumer()
                     .Topic(topicName)
                     .SubscriptionName("test-subscription")
                     .ConsumerName(consumerName)
@@ -72,21 +72,21 @@ let tests =
             let producerName2 = "PartitionedProducer2"
 
             let! producer1 =
-                ProducerBuilder(client)
+                client.NewProducer()
                     .Topic(topicName)
                     .ProducerName(producerName1)
                     .MessageRoutingMode(MessageRoutingMode.SinglePartition)
                     .CreateAsync() |> Async.AwaitTask
 
             let! producer2 =
-                ProducerBuilder(client)
+                client.NewProducer()
                     .Topic(topicName)
                     .ProducerName(producerName2)
                     .MessageRoutingMode(MessageRoutingMode.SinglePartition)
                     .CreateAsync() |> Async.AwaitTask
 
             let! consumer1 =
-                ConsumerBuilder(client)
+                client.NewConsumer()
                     .Topic(topicName)
                     .SubscriptionName("test-subscription")
                     .SubscriptionType(SubscriptionType.Shared)
@@ -95,7 +95,7 @@ let tests =
                     .SubscribeAsync() |> Async.AwaitTask
 
             let! consumer2 =
-                ConsumerBuilder(client)
+                client.NewConsumer()
                     .Topic(topicName)
                     .SubscriptionName("test-subscription")
                     .SubscriptionType(SubscriptionType.Shared)
@@ -161,14 +161,14 @@ let tests =
             let batchSize = 8
 
             let! producer =
-                ProducerBuilder(client)
+                client.NewProducer()
                     .Topic(topicName)
                     .ProducerName(producerName)
                     .EnableBatching(false)
                     .CreateAsync() |> Async.AwaitTask
 
             let! consumer =
-                ConsumerBuilder(client)
+                client.NewConsumer()
                     .Topic(topicName)
                     .SubscriptionName("test-subscription")
                     .ConsumerName(consumerName)

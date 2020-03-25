@@ -186,3 +186,15 @@ type PulsarClient(config: PulsarClientConfiguration) as this =
     member private this.ClientState
         with get() = Volatile.Read(&clientState)
         and set(value) = Volatile.Write(&clientState, value)
+        
+    member this.NewProducer() =
+        ProducerBuilder(this.CreateProducerAsync, Schema.BYTES)
+        
+    member this.NewProducer(schema) =
+        ProducerBuilder(this.CreateProducerAsync, schema)
+        
+    member this.NewConsumer() =
+        ConsumerBuilder(this.SubscribeAsync, this.CreateProducerAsync)
+        
+    member this.NewReader() =
+        ReaderBuilder(this.CreateReaderAsync)

@@ -21,12 +21,12 @@ let runSimple () =
     task {
 
         let! producer =
-            ProducerBuilder(client)
+            client.NewProducer()
                 .Topic(topicName)
                 .CreateAsync()
 
         let! consumer =
-            ConsumerBuilder(client)
+            client.NewConsumer()
                 .Topic(topicName)
                 .SubscriptionName(subscriptionName)
                 .SubscriptionType(SubscriptionType.Exclusive)

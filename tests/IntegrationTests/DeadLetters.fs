@@ -15,8 +15,8 @@ let tests =
 
     let logTestStart testDescription = Log.Debug(sprintf "Started '%s'" testDescription)
     let logTestEnd testDescription = Log.Debug(sprintf "Finished '%s'" testDescription)
-    let createProducer() = getClient() |> ProducerBuilder
-    let createConsumer() = getClient() |> ConsumerBuilder
+    let createProducer() = getClient().NewProducer()
+    let createConsumer() = getClient().NewConsumer()
 
     let getTestConfig() =
         let newGuid = Guid.NewGuid().ToString("N")

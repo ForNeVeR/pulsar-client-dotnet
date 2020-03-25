@@ -27,12 +27,12 @@ let tests =
             let consumerName = "AckTimeoutConsumerWithBatching"
 
             let! producer =
-                ProducerBuilder(client)
+                client.NewProducer()
                     .Topic(topicName)
                     .CreateAsync() |> Async.AwaitTask
 
             let! consumer =
-                ConsumerBuilder(client)
+                client.NewConsumer()
                     .Topic(topicName)
                     .SubscriptionName("test-subscription")
                     .ConsumerName(consumerName)
@@ -82,12 +82,12 @@ let tests =
             let consumerName = "AckTimeoutConsumer"
 
             let! producer =
-                ProducerBuilder(client)
+                client.NewProducer()
                     .Topic(topicName)
                     .CreateAsync() |> Async.AwaitTask
 
             let! consumer =
-                ConsumerBuilder(client)
+                client.NewConsumer()
                     .Topic(topicName)
                     .SubscriptionName("test-subscription")
                     .ConsumerName(consumerName)
@@ -136,13 +136,13 @@ let tests =
             let topicName = "public/default/topic-" + Guid.NewGuid().ToString("N")
 
             let! producer =
-                ProducerBuilder(client)
+                client.NewProducer()
                     .Topic(topicName)
                     .EnableBatching(false)
                     .CreateAsync() |> Async.AwaitTask
 
             let! consumer =
-                ConsumerBuilder(client)
+                client.NewConsumer()
                     .Topic(topicName)
                     .SubscriptionName("test-subscription")
                     .ConsumerName("AckTimeoutConsumerShared")
@@ -195,12 +195,12 @@ let tests =
             let consumerName = "CumulativeAcker"
 
             let! producer =
-                ProducerBuilder(client)
+                client.NewProducer()
                     .Topic(topicName)
                     .CreateAsync() |> Async.AwaitTask
 
             let! consumer =
-                ConsumerBuilder(client)
+                client.NewConsumer()
                     .Topic(topicName)
                     .SubscriptionName("test-subscription")
                     .ConsumerName(consumerName)
@@ -257,7 +257,7 @@ let tests =
             let messagesCount = 10
 
             let! producer =
-                ProducerBuilder(client)
+                client.NewProducer()
                     .Topic(topicName)
                     .EnableBatching(true)
                     .ProducerName(producerName)
@@ -265,7 +265,7 @@ let tests =
                     .CreateAsync() |> Async.AwaitTask
 
             let! consumer =
-                ConsumerBuilder(client)
+                client.NewConsumer()
                     .Topic(topicName)
                     .SubscriptionName("test-subscription")
                     .ConsumerName(consumerName)
@@ -312,7 +312,7 @@ let tests =
             let messagesCount = 10
 
             let! producer =
-                ProducerBuilder(client)
+                client.NewProducer()
                     .Topic(topicName)
                     .EnableBatching(true)
                     .ProducerName(producerName)
@@ -320,7 +320,7 @@ let tests =
                     .CreateAsync() |> Async.AwaitTask
 
             let! consumer =
-                ConsumerBuilder(client)
+                client.NewConsumer()
                     .Topic(topicName)
                     .SubscriptionName("test-subscription")
                     .ConsumerName(consumerName)
@@ -374,12 +374,12 @@ let tests =
             let consumerName = "NegativeAcksConsumer"
 
             let! producer =
-                ProducerBuilder(client)
+                client.NewProducer()
                     .Topic(topicName)
                     .CreateAsync() |> Async.AwaitTask
 
             let! consumer =
-                ConsumerBuilder(client)
+                client.NewConsumer()
                     .Topic(topicName)
                     .SubscriptionName("test-subscription")
                     .ConsumerName(consumerName)

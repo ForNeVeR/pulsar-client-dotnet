@@ -57,13 +57,13 @@ let runRealWorld (logger: ILogger) =
     task {
 
         let! producer =
-            ProducerBuilder<byte[]>(client)
+            client.NewProducer()
                 .Topic(topicName)
                 .EnableBatching(false)
                 .CreateAsync()
 
         let! consumer =
-            ConsumerBuilder(client)
+            client.NewConsumer()
                 .Topic(topicName)
                 .SubscriptionName(subscriptionName)
                 .SubscribeAsync()

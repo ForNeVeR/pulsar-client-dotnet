@@ -60,12 +60,12 @@ let tests =
             let consumerInterceptor = ConsumerInterceptorOnAcknowledge()
             
             let! producer =
-                ProducerBuilder(client)
+                client.NewProducer()
                     .Topic(topicName)
                     .CreateAsync() |> Async.AwaitTask
             
             let! consumer =
-                ConsumerBuilder(client)
+                client.NewConsumer()
                     .Topic(topicName)
                     .ConsumerName("concurrent")
                     .SubscriptionName("test-subscription")
@@ -98,12 +98,12 @@ let tests =
             let numberOfMessages = 10
 
             let! producer =
-                ProducerBuilder(client)
+                client.NewProducer()
                     .Topic(topicName)
                     .CreateAsync() |> Async.AwaitTask
             
             let! consumer =
-                ConsumerBuilder(client)
+                client.NewConsumer()
                     .Topic(topicName)
                     .ConsumerName("concurrent")
                     .SubscriptionName("test-subscription")
@@ -140,12 +140,12 @@ let tests =
             let consumerInterceptor = ConsumerInterceptorOnAcknowledge()
             
             let! producer =
-                ProducerBuilder(client)
+                client.NewProducer()
                     .Topic(topicName)
                     .CreateAsync() |> Async.AwaitTask
             
             let! consumer =
-                ConsumerBuilder(client)
+                client.NewConsumer()
                     .Topic(topicName)
                     .ConsumerName("concurrent")
                     .SubscriptionName("test-subscription")
@@ -183,14 +183,14 @@ let tests =
             let consumerInterceptor = ConsumerInterceptorOnAcknowledge()
             
             let! producer =
-                ProducerBuilder(client)
+                client.NewProducer()
                     .Topic(topicName)
                     .BatchingMaxMessages(3)
                     .BatchingMaxPublishDelay(TimeSpan.FromMilliseconds(1000.0))
                     .CreateAsync() |> Async.AwaitTask
             
             let! consumer =
-                ConsumerBuilder(client)
+                client.NewConsumer()
                     .Topic(topicName)
                     .ConsumerName("concurrent")
                     .SubscriptionName("test-subscription")
@@ -248,12 +248,12 @@ let tests =
             let consumerInterceptor = ConsumerInterceptorOnAcknowledge()
             
             let! producer =
-                ProducerBuilder(client)
+                client.NewProducer()
                     .Topic(topicName)
                     .CreateAsync() |> Async.AwaitTask
             
             let! consumer =
-                ConsumerBuilder(client)
+                client.NewConsumer()
                     .Topic(topicName)
                     .ConsumerName("concurrent")
                     .SubscriptionName("test-subscription")
@@ -294,12 +294,12 @@ let tests =
             let consumerInterceptor = ConsumerInterceptorOnAcknowledge()
             
             let! producer =
-                ProducerBuilder(client)
+                client.NewProducer()
                     .Topic(topicName)
                     .CreateAsync() |> Async.AwaitTask
             
             let! consumer =
-                ConsumerBuilder(client)
+                client.NewConsumer()
                     .Topic(topicName)
                     .ConsumerName("concurrent")
                     .SubscriptionName("test-subscription")

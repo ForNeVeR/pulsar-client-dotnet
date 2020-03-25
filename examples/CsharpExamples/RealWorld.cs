@@ -68,12 +68,12 @@ namespace CsharpExamples
                 .ServiceUrl(serviceUrl)
                 .Build();
 
-            var producer = await new ProducerBuilder<byte[]>(client)
+            var producer = await client.NewProducer()
                 .Topic(topicName)
                 .EnableBatching(false)
                 .CreateAsync();
 
-            var consumer = await new ConsumerBuilder(client)
+            var consumer = await client.NewConsumer()
                 .Topic(topicName)
                 .SubscriptionName(subscriptionName)
                 .SubscribeAsync();

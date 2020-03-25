@@ -69,13 +69,13 @@ let tests =
             let messageIds = ResizeArray<MessageId>()
             let prodInterceptor = ProducerInterceptorSendAck()
             let! producer =
-                ProducerBuilder(client)
+                client.NewProducer()
                     .Topic(topicName)
                     .Intercept(prodInterceptor)
                     .CreateAsync() |> Async.AwaitTask
             
             let! consumer =
-                ConsumerBuilder(client)
+                client.NewConsumer()
                     .Topic(topicName)
                     .ConsumerName("concurrent")
                     .SubscriptionName("test-subscription")
@@ -113,13 +113,13 @@ let tests =
             let prodInterceptor = ProducerInterceptorEligible()
             
             let! consumer =
-                ConsumerBuilder(client)
+                client.NewConsumer()
                     .Topic(topicName)
                     .ConsumerName("concurrent")
                     .SubscriptionName("test-subscription")
                     .SubscribeAsync() |> Async.AwaitTask
             let! producer =
-                ProducerBuilder(client)
+                client.NewProducer()
                     .Topic(topicName)
                     .Intercept(prodInterceptor)
                     .CreateAsync() |> Async.AwaitTask
@@ -170,14 +170,14 @@ let tests =
             
             let prodInterceptor = ProducerInterceptorBefore()
             let! producer =
-                ProducerBuilder(client)
+                client.NewProducer()
                     .EnableBatching(false)
                     .Topic(topicName)
                     .Intercept(prodInterceptor)
                     .CreateAsync() |> Async.AwaitTask
             
             let! consumer =
-                ConsumerBuilder(client)
+                client.NewConsumer()
                     .Topic(topicName)
                     .ConsumerName("concurrent")
                     .SubscriptionName("test-subscription")
@@ -212,13 +212,13 @@ let tests =
             let messageIds = ResizeArray<MessageId>()
             let prodInterceptor = ProducerInterceptorSendAck()
             let! producer =
-                ProducerBuilder(client)
+                client.NewProducer()
                     .Topic(topicName)
                     .Intercept(prodInterceptor)
                     .CreateAsync() |> Async.AwaitTask
             
             let! consumer =
-                ConsumerBuilder(client)
+                client.NewConsumer()
                     .Topic(topicName)
                     .ConsumerName("concurrent")
                     .SubscriptionName("test-subscription")

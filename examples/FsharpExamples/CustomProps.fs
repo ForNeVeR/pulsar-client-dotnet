@@ -22,12 +22,12 @@ let runCustomProps () =
     task {
 
         let! producer =
-            ProducerBuilder<byte[]>(client)
+            client.NewProducer()
                 .Topic(topicName)
                 .CreateAsync()
 
         let! consumer =
-            ConsumerBuilder(client)
+            client.NewConsumer()
                 .Topic(topicName)
                 .SubscriptionName(subscriptionName)
                 .SubscribeAsync()

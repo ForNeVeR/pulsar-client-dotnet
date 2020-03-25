@@ -31,7 +31,7 @@ let tests =
         let topicName = "public/default/topic-" + Guid.NewGuid().ToString("N")
 
         let! producer =
-            ProducerBuilder(client)
+            client.NewProducer()
                 .Topic(topicName)
                 .ProducerName("compression-single")
                 .EnableBatching(enableBatching)
@@ -39,7 +39,7 @@ let tests =
                 .CreateAsync() |> Async.AwaitTask
 
         let! consumer =
-            ConsumerBuilder(client)
+            client.NewConsumer()
                 .Topic(topicName)
                 .ConsumerName("compression-single")
                 .SubscriptionName("test-subscription")

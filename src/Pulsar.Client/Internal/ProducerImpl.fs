@@ -11,6 +11,7 @@ open Microsoft.Extensions.Logging
 open System.Collections.Generic
 open System.Timers
 open System.IO
+open System.Threading.Tasks
 
 type internal ProducerMessage<'T> =
     | ConnectionOpened
@@ -195,7 +196,8 @@ type internal ProducerImpl<'T> private (producerConfig: ProducerConfiguration, c
     let stopProducer() =
         sendTimeoutTimer.Stop()
         batchTimer.Stop()
-        connectionHandler.Close()
+        connectionHandler.Close()       
+        interceptors.Close()
         cleanup(this)
         Log.Logger.LogInformation("{0} stopped", prefix)
         
@@ -523,13 +525,13 @@ type internal ProducerImpl<'T> private (producerConfig: ProducerConfiguration, c
         
     interface IAsyncDisposable with
         
-        member this.DisposeAsync() =
-            task {
-                interceptors.Close()
-                match connectionHandler.ConnectionState with
-                | Closing | Closed ->
-                    return ()
-                | _ ->
+        member this.DisposeAsync() =     
+            match connectionHandler.ConnectionState with
+            | Closing | Closed ->
+                ValueTask()
+            | _ ->
+                task {
                     let! result = mb.PostAndAsyncReply(ProducerMessage.Close)
                     return! result
-            } |> ValueTask
+                } |> ValueTask
+            
