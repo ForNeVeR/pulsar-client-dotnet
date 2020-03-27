@@ -33,11 +33,11 @@ type ProducerInterceptorBefore() =
         
         member this.Eligible(_) = true
         
-        member this.BeforeSend(_, message) =
+        member this.BeforeSend(producer, message) =
             let msgValue = message.Value |> Encoding.UTF8.GetString
             let newProp = Dictionary(message.Properties)
             newProp.Add("BeforeSend", msgValue)
-            MessageBuilder(message.Value, %message.Key, newProp, message.DeliverAt)
+            producer.NewMessage(message.Value, %message.Key, newProp, message.DeliverAt)
         
         member this.OnSendAcknowledgement(_, _, _, _) = ()
 
@@ -83,7 +83,7 @@ let tests =
 
             let messages =
                 generateMessages numberOfMessages "concurrent"
-                |> Seq.map Encoding.UTF8.GetBytes |> Seq.map MessageBuilder
+                |> Seq.map Encoding.UTF8.GetBytes
 
             let producerTask =
                 Task.Run(fun () ->
@@ -127,12 +127,12 @@ let tests =
             let eligibleMessages =
                 let property = dict ["Eligible", "true"] |> Dictionary
                 generateMessages numberOfMessages "Eligible"
-                |> Seq.map(fun msg -> MessageBuilder(Encoding.UTF8.GetBytes(msg), properties = property))
+                |> Seq.map(fun msg -> producer.NewMessage(Encoding.UTF8.GetBytes(msg), properties = property))
 
             let noEligibleMessages =
                 let property = dict ["Eligible", "false"] |> Dictionary
                 generateMessages numberOfMessages "No_Eligible"
-                |> Seq.map(fun msg -> MessageBuilder(Encoding.UTF8.GetBytes(msg), properties = property))
+                |> Seq.map(fun msg -> producer.NewMessage(Encoding.UTF8.GetBytes(msg), properties = property))
                 
             let allMessages =
                 seq {
@@ -226,7 +226,8 @@ let tests =
 
             let messages =
                 generateMessages numberOfMessages "concurrent"
-                |> Seq.map Encoding.UTF8.GetBytes |> Seq.map MessageBuilder
+                |> Seq.map Encoding.UTF8.GetBytes
+                |> Seq.map (fun bytes -> producer.NewMessage(bytes))
 
             let producerTask =
                 Task.Run(fun () ->

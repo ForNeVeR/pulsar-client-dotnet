@@ -59,7 +59,7 @@ let produceMessagesWithProps (producer: IProducer<byte[]>) number producerName =
             let payload = Encoding.UTF8.GetBytes(sprintf "Message #%i Sent from %s on %s" i producerName (DateTime.Now.ToLongTimeString()) )
             let key = i.ToString()
             let props = readOnlyDict [("prop1",key);("prop2",key)]
-            let! _ = producer.SendAsync(MessageBuilder(payload, key, props))
+            let! _ = producer.NewMessage(payload, key, props) |> producer.SendAsync
             ()
     }
 
@@ -67,7 +67,7 @@ let produceMessagesWithSameKey (producer: IProducer<byte[]>) number key producer
     task {
         for i in [1..number] do
             let payload = Encoding.UTF8.GetBytes(sprintf "Message #%i Sent from %s on %s" i producerName (DateTime.Now.ToLongTimeString()) )
-            let! _ = producer.SendAsync(MessageBuilder(payload, key))
+            let! _ = producer.NewMessage(payload, key) |> producer.SendAsync
             ()
     }
 
@@ -95,7 +95,7 @@ let fastProduceMessagesWithSameKey (producer: IProducer<byte[]>) number key prod
     task {
         for i in [1..number] do
             let payload = Encoding.UTF8.GetBytes(sprintf "Message #%i Sent from %s on %s" i producerName (DateTime.Now.ToLongTimeString()) )
-            let! _ = producer.SendAndForgetAsync(MessageBuilder(payload, key))
+            let! _ = producer.NewMessage(payload, key) |> producer.SendAndForgetAsync
             ()
     }
 

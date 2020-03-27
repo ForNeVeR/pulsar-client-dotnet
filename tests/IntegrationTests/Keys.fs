@@ -95,7 +95,7 @@ let tests =
                         let firstKey = "111111"
                         let secondKey = "444444"
                         let getMessageBuilder key i =
-                            MessageBuilder(Encoding.UTF8.GetBytes(key + "Hello" + i), key)
+                            producer.NewMessage(Encoding.UTF8.GetBytes(key + "Hello" + i), key)
                         let! _ = producer.SendAsync(getMessageBuilder firstKey "0")
                         let! _ = producer.SendAsync(getMessageBuilder secondKey "0")
                         let! _ = producer.SendAsync(getMessageBuilder firstKey "1")

@@ -6,6 +6,8 @@ open FSharp.UMX
 open Pulsar.Client.Common
 open Pulsar.Client.Internal
 open System
+open System.Collections.Generic
+open System.Runtime.InteropServices
 open Microsoft.Extensions.Logging
 open System.Threading
 open System.Timers
@@ -23,7 +25,9 @@ type internal PartitionedConnectionState =
     | Closed
 
 type internal PartitionedProducerImpl<'T> private (producerConfig: ProducerConfiguration, clientConfig: PulsarClientConfiguration, connectionPool: ConnectionPool,
-                                      numPartitions: int, lookup: BinaryLookupService, interceptors: ProducerInterceptors<'T>, cleanup: PartitionedProducerImpl<'T> -> unit) as this =
+                                      numPartitions: int, lookup: BinaryLookupService, schema: Schema<'T>,
+                                      interceptors: ProducerInterceptors<'T>, cleanup: PartitionedProducerImpl<'T> -> unit) as this =
+    let _this = this :> IProducer<'T>
     let producerId = Generators.getNextProducerId()
     let prefix = sprintf "p/producer(%u, %s)" %producerId producerConfig.ProducerName
     let producers = ResizeArray<IProducer<'T>>(numPartitions)
@@ -73,7 +77,8 @@ type internal PartitionedProducerImpl<'T> private (producerConfig: ProducerConfi
                             let partititonedConfig = { producerConfig with
                                                         MaxPendingMessages = maxPendingMessages
                                                         Topic = partitionedTopic }
-                            ProducerImpl.Init(partititonedConfig, clientConfig, connectionPool, partitionIndex, lookup, interceptors, fun _ -> ()))
+                            ProducerImpl.Init(partititonedConfig, clientConfig, connectionPool, partitionIndex, lookup,
+                                              schema, interceptors, fun _ -> ()))
                     // we mark success if all the partitions are created
                     // successfully, else we throw an exception
                     // due to any
@@ -141,7 +146,8 @@ type internal PartitionedProducerImpl<'T> private (producerConfig: ProducerConfi
                                     let partititonedConfig = { producerConfig with
                                                                 MaxPendingMessages = maxPendingMessages
                                                                 Topic = partitionedTopic }
-                                    ProducerImpl.Init(partititonedConfig, clientConfig, connectionPool, partitionIndex, lookup, interceptors, fun _ -> ()))
+                                    ProducerImpl.Init(partititonedConfig, clientConfig, connectionPool, partitionIndex, lookup,
+                                                      schema, interceptors, fun _ -> ()))
                             try
                                 let! producerResults =
                                     producerTasks
@@ -211,9 +217,11 @@ type internal PartitionedProducerImpl<'T> private (producerConfig: ProducerConfi
        }
 
     static member Init(producerConfig: ProducerConfiguration, clientConfig: PulsarClientConfiguration, connectionPool: ConnectionPool,
-                        partitions: int, lookup: BinaryLookupService, interceptors:ProducerInterceptors<'T>, cleanup: PartitionedProducerImpl<'T> -> unit) =
+                        partitions: int, lookup: BinaryLookupService, schema: Schema<'T>,
+                        interceptors:ProducerInterceptors<'T>, cleanup: PartitionedProducerImpl<'T> -> unit) =
         task {
-            let producer = PartitionedProducerImpl(producerConfig, clientConfig, connectionPool, partitions, lookup, interceptors, cleanup)
+            let producer = PartitionedProducerImpl(producerConfig, clientConfig, connectionPool, partitions, lookup,
+                                                   schema, interceptors, cleanup)
             do! producer.InitInternal()
             return producer :> IProducer<'T>
         }
@@ -222,7 +230,7 @@ type internal PartitionedProducerImpl<'T> private (producerConfig: ProducerConfi
 
         member this.SendAndForgetAsync (message: 'T) =
             task {
-                let partition = this.ChoosePartitionIfActive(MessageBuilder(message))
+                let partition = _this.NewMessage message |> this.ChoosePartitionIfActive
                 return! producers.[partition].SendAndForgetAsync(message)
             }
 
@@ -234,7 +242,7 @@ type internal PartitionedProducerImpl<'T> private (producerConfig: ProducerConfi
 
         member this.SendAsync (message: 'T) =
             task {
-                let partition = this.ChoosePartitionIfActive(MessageBuilder(message))
+                let partition = _this.NewMessage message |> this.ChoosePartitionIfActive
                 return! producers.[partition].SendAsync(message)
             }
 
@@ -243,6 +251,12 @@ type internal PartitionedProducerImpl<'T> private (producerConfig: ProducerConfi
                 let partition = this.ChoosePartitionIfActive(message)
                 return! producers.[partition].SendAsync(message)
             }
+            
+        member this.NewMessage (value:'T,
+            [<Optional; DefaultParameterValue(null:string)>]key:string,
+            [<Optional; DefaultParameterValue(null:IReadOnlyDictionary<string,string>)>]properties: IReadOnlyDictionary<string, string>,
+            [<Optional; DefaultParameterValue(Nullable():Nullable<int64>)>]deliverAt:Nullable<int64>) =
+            MessageBuilder(value, [||], key, properties, deliverAt)
 
         member this.ProducerId = producerId
 

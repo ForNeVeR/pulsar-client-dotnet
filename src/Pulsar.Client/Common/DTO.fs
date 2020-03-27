@@ -225,7 +225,7 @@ type Messages internal(maxNumberOfMessages: int, maxSizeOfMessages: int64) =
 /// </summary>
 type MessageBuilder<'T> =
     val Value: 'T
-    val internal Payload: byte[]
+    val Payload: byte[]
     val Key: MessageKey
     val Properties: IReadOnlyDictionary<string, string>
     val DeliverAt: Nullable<int64>
@@ -240,7 +240,7 @@ type MessageBuilder<'T> =
     ///     This <paramref name="deliverAt" /> timestamp must be expressed as unix time milliseconds based on UTC.
     ///     For example: <code>DateTimeOffset.UtcNow.AddSeconds(2.0).ToUnixTimeMilliseconds()</code>.
     /// </remarks>
-    new (value : 'T,
+    internal new (value : 'T, payload: byte[],
             [<Optional; DefaultParameterValue(null:string)>] key : string,
             [<Optional; DefaultParameterValue(null:IReadOnlyDictionary<string, string>)>] properties : IReadOnlyDictionary<string, string>,
             [<Optional; DefaultParameterValue(Nullable():Nullable<int64>)>] deliverAt : Nullable<int64>) =
@@ -249,8 +249,9 @@ type MessageBuilder<'T> =
                 Key = if isNull key then %"" else %key
                 Properties = if isNull properties then EmptyProps else properties
                 DeliverAt = deliverAt
-                Payload = [||] //TODO!!!
+                Payload = payload
             }
+        
         
 type internal WriterStream = Stream
 type internal Payload = WriterStream -> Task

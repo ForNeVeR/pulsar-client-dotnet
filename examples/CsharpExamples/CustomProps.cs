@@ -29,7 +29,8 @@ namespace CsharpExamples
                 .SubscribeAsync();
 
             var payload = Encoding.UTF8.GetBytes($"Sent from C# at '{DateTime.Now}'");
-            var messageId = await producer.SendAsync(new MessageBuilder<byte[]>(payload, "C#", new Dictionary<string, string> { ["1"] = "one" }));
+            var msg = producer.NewMessage(payload, "C#", new Dictionary<string, string> { ["1"] = "one" });
+            var messageId = await producer.SendAsync(msg);
             Console.WriteLine($"MessageId is: '{messageId}'");
 
             var message = await consumer.ReceiveAsync();

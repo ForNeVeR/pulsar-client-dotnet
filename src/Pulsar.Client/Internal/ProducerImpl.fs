@@ -11,6 +11,7 @@ open Microsoft.Extensions.Logging
 open System.Collections.Generic
 open System.Timers
 open System.IO
+open System.Runtime.InteropServices
 open System.Threading.Tasks
 
 type internal ProducerMessage<'T> =
@@ -29,6 +30,7 @@ type internal ProducerMessage<'T> =
 
 type internal ProducerImpl<'T> private (producerConfig: ProducerConfiguration, clientConfig: PulsarClientConfiguration, connectionPool: ConnectionPool,
                            partitionIndex: int, lookup: BinaryLookupService, interceptors: ProducerInterceptors<'T>, cleanup: ProducerImpl<'T> -> unit) as this =
+    let _this = this :> IProducer<'T>
     let producerId = Generators.getNextProducerId()
 
     let prefix = sprintf "producer(%u, %s, %i)" %producerId producerConfig.ProducerName partitionIndex
@@ -156,7 +158,7 @@ type internal ProducerImpl<'T> private (producerConfig: ProducerConfiguration, c
 
     let sendOneBatch (batchPayload: byte[], batchCallbacks: BatchCallback<'T>[]) =
         let batchSize = batchCallbacks.Length
-        let msgBuilder = MessageBuilder(batchPayload)
+        let msgBuilder = MessageBuilder(batchPayload, batchPayload)
         let metadata = createMessageMetadata msgBuilder (Some batchSize)
         let sequenceId = %metadata.SequenceId
         let encodedBatchPayload = compressionCodec.Encode msgBuilder.Payload
@@ -483,7 +485,8 @@ type internal ProducerImpl<'T> private (producerConfig: ProducerConfiguration, c
        }
 
     static member Init(producerConfig: ProducerConfiguration, clientConfig: PulsarClientConfiguration, connectionPool: ConnectionPool,
-                       partitionIndex: int, lookup: BinaryLookupService, interceptors: ProducerInterceptors<'T>, cleanup: ProducerImpl<'T> -> unit) =
+                       partitionIndex: int, lookup: BinaryLookupService, schema: Schema<'T>,
+                       interceptors: ProducerInterceptors<'T>, cleanup: ProducerImpl<'T> -> unit) =
         task {
             let producer = ProducerImpl(producerConfig, clientConfig, connectionPool, partitionIndex, lookup, interceptors, cleanup)
             do! producer.InitInternal()
@@ -494,7 +497,7 @@ type internal ProducerImpl<'T> private (producerConfig: ProducerConfiguration, c
         member this.SendAndForgetAsync (message: 'T) =
             task {
                 connectionHandler.CheckIfActive() |> throwIfNotNull
-                let! _ = this.SendMessage (MessageBuilder(message))
+                let! _ = _this.NewMessage message |> this.SendMessage
                 return ()
             }
 
@@ -508,7 +511,7 @@ type internal ProducerImpl<'T> private (producerConfig: ProducerConfiguration, c
         member this.SendAsync (message: 'T) =
             task {
                 connectionHandler.CheckIfActive() |> throwIfNotNull
-                let! tcs = this.SendMessage (MessageBuilder(message))
+                let! tcs = _this.NewMessage message |> this.SendMessage
                 return! tcs.Task
             }
 
@@ -519,6 +522,12 @@ type internal ProducerImpl<'T> private (producerConfig: ProducerConfiguration, c
                 return! tcs.Task
             }
 
+        member this.NewMessage (value:'T,
+            [<Optional; DefaultParameterValue(null:string)>]key:string,
+            [<Optional; DefaultParameterValue(null:IReadOnlyDictionary<string,string>)>]properties: IReadOnlyDictionary<string, string>,
+            [<Optional; DefaultParameterValue(Nullable():Nullable<int64>)>]deliverAt:Nullable<int64>) =
+            MessageBuilder(value, [||], key, properties, deliverAt) //TODO
+        
         member this.ProducerId = producerId
 
         member this.Topic = %producerConfig.Topic.CompleteTopicName

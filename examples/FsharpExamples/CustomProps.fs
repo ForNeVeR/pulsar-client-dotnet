@@ -33,7 +33,8 @@ let runCustomProps () =
                 .SubscribeAsync()
 
         let payload = Encoding.UTF8.GetBytes(sprintf "Sent from F# at '%A'" DateTime.Now)
-        let! messageId = producer.SendAsync(MessageBuilder(payload, "F#", readOnlyDict [("1","one")]))
+        let msg = producer.NewMessage(payload, "F#", readOnlyDict [("1","one")])
+        let! messageId = producer.SendAsync(msg)
         printfn "MessageId is: '%A'" messageId
 
         let! message = consumer.ReceiveAsync()

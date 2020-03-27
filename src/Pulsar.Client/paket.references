@@ -5,6 +5,7 @@ Pipelines.Sockets.Unofficial
 Microsoft.IO.RecyclableMemoryStream
 Microsoft.Extensions.Logging
 Microsoft.Extensions.Logging.Abstractions
+Microsoft.Bcl.AsyncInterfaces
 protobuf-net
 NETStandard.Library
 zlib.net-mutliplatform

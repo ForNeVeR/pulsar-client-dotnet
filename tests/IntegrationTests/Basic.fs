@@ -379,9 +379,8 @@ let tests =
                         let deliverAt = now.AddMilliseconds(float interval)
                         let timestamp = Nullable(deliverAt.ToUnixTimeMilliseconds())
                         let message = Encoding.UTF8.GetBytes(sprintf "Message was sent with interval '%i' milliseconds" interval)
-                        let messageBuilder = MessageBuilder(message, deliverAt = timestamp)
                         sw.Start()
-                        let! _ = producer.SendAsync(messageBuilder)
+                        let! _ = producer.NewMessage(message, deliverAt = timestamp) |> producer.SendAsync
                         ()
                     }:> Task)
 
