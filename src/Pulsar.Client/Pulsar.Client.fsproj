@@ -83,6 +83,11 @@
     <Compile Include="Internal\ConsumerImpl.fs" />
     <Compile Include="Internal\MultiTopicsConsumerImpl.fs" />
     <Compile Include="Internal\PartitionedProducerImpl.fs" />
+    <Compile Include="Schema\BytesSchema.fs" />
+    <Compile Include="Schema\BooleanSchema.fs" />
+    <Compile Include="Schema\StringSchema.fs" />
+    <Compile Include="Schema\JsonSchema.fs" />
+    <Compile Include="Schema\Schema.fs" />
     <Compile Include="Api\AuthenticationFactory.fs" />
     <Compile Include="Api\Reader.fs" />
     <Compile Include="Api\ProducerBuilder.fs" />

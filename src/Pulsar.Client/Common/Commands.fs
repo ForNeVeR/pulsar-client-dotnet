@@ -3,6 +3,7 @@
 open pulsar.proto
 open FSharp.UMX
 open System
+open System.Data
 open ProtoBuf
 open System.IO
 open System.Net
@@ -93,6 +94,31 @@ let serializePayloadCommand (command : BaseCommand) (metadata: MessageMetadata) 
 
         Log.Logger.LogDebug("Sending message of type {0}", command.``type``)
         stream.CopyToAsync(output)
+
+
+let getSchemaType (schemaType: SchemaType) =
+    let schemaNumber = int schemaType
+    if schemaNumber >= 0 then
+        enum schemaNumber
+    else
+        Schema.Type.None
+        
+let getSchema (schemaInfo: ISchema<'T>) : Schema =
+     Schema (
+         Name = schemaInfo.Name,
+         ``type`` = getSchemaType schemaInfo.Type
+     )
+//        .setName(schemaInfo.getName())
+//        .setSchemaData(copyFrom(schemaInfo.getSchema()))
+//        .setType(getSchemaType(schemaInfo.getType()))
+//        .addAllProperties(
+//            schemaInfo.getProperties().entrySet().stream().map(entry ->
+//                KeyValue.newBuilder()
+//                    .setKey(entry.getKey())
+//                    .setValue(entry.getValue())
+//                    .build()
+//            ).collect(Collectors.toList())
+//        );
 
 let newPartitionMetadataRequest(topicName : CompleteTopicName) (requestId : RequestId) : Payload =
     let request = CommandPartitionedTopicMetadata(Topic = %topicName, RequestId = %requestId)

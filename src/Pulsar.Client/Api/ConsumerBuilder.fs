@@ -119,7 +119,7 @@ type ConsumerBuilder private (createConsumerAsync, createProducerAsync, config: 
         let getTopicName() = config.Topic.ToString()
         let getSubscriptionName() = config.SubscriptionName
         let createProducer deadLetterTopic =
-            ProducerBuilder(createProducerAsync, Schema.BYTES)
+            ProducerBuilder(createProducerAsync, Schema.BYTES())
                 .Topic(deadLetterTopic)
                 .EnableBatching(false) // dead letters are sent one by one anyway
                 .CreateAsync()

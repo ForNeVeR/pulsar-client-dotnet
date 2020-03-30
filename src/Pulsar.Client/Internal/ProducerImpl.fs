@@ -485,7 +485,7 @@ type internal ProducerImpl<'T> private (producerConfig: ProducerConfiguration, c
        }
 
     static member Init(producerConfig: ProducerConfiguration, clientConfig: PulsarClientConfiguration, connectionPool: ConnectionPool,
-                       partitionIndex: int, lookup: BinaryLookupService, schema: Schema<'T>,
+                       partitionIndex: int, lookup: BinaryLookupService, schema: ISchema<'T>,
                        interceptors: ProducerInterceptors<'T>, cleanup: ProducerImpl<'T> -> unit) =
         task {
             let producer = ProducerImpl(producerConfig, clientConfig, connectionPool, partitionIndex, lookup, interceptors, cleanup)

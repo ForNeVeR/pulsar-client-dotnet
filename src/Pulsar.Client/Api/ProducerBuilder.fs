@@ -5,7 +5,7 @@ open Pulsar.Client.Internal
 open System
 open System.Threading.Tasks
 
-type ProducerBuilder<'T> private (сreateProducerAsync, config: ProducerConfiguration, producerInterceptors: ProducerInterceptors<'T>, schema: Schema<'T>) =
+type ProducerBuilder<'T> private (сreateProducerAsync, config: ProducerConfiguration, producerInterceptors: ProducerInterceptors<'T>, schema: ISchema<'T>) =
 
     let verify(config : ProducerConfiguration) =
         let checkValue check config =
@@ -22,7 +22,7 @@ type ProducerBuilder<'T> private (сreateProducerAsync, config: ProducerConfigur
                 c.MessageRoutingMode
                 |> invalidArgIf (fun mode -> mode = MessageRoutingMode.CustomPartition && Option.isNone config.CustomMessageRouter) "Valid router should be set with CustomPartition routing mode.")
 
-    internal new(сreateProducerAsync, schema: Schema<'T>) = ProducerBuilder(сreateProducerAsync, ProducerConfiguration.Default, ProducerInterceptors.Empty, schema)
+    internal new(сreateProducerAsync, schema: ISchema<'T>) = ProducerBuilder(сreateProducerAsync, ProducerConfiguration.Default, ProducerInterceptors.Empty, schema)
 
     member private this.With(newConfig: ProducerConfiguration) =
         ProducerBuilder<'T>(сreateProducerAsync, newConfig, producerInterceptors, schema)

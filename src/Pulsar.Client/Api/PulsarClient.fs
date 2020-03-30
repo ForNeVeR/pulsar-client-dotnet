@@ -152,7 +152,7 @@ type PulsarClient(config: PulsarClientConfiguration) as this =
                 return consumer :> IConsumer
         }
 
-    member internal this.CreateProducerAsync<'T> (producerConfig: ProducerConfiguration, schema: Schema<'T>, interceptors: ProducerInterceptors<'T>) =
+    member internal this.CreateProducerAsync<'T> (producerConfig: ProducerConfiguration, schema: ISchema<'T>, interceptors: ProducerInterceptors<'T>) =
         task {
             checkIfActive()
             Log.Logger.LogDebug("CreateProducerAsync started")
@@ -190,7 +190,7 @@ type PulsarClient(config: PulsarClientConfiguration) as this =
         and set(value) = Volatile.Write(&clientState, value)
         
     member this.NewProducer() =
-        ProducerBuilder(this.CreateProducerAsync, Schema.BYTES)
+        ProducerBuilder(this.CreateProducerAsync, Schema.BYTES())
         
     member this.NewProducer(schema) =
         ProducerBuilder(this.CreateProducerAsync, schema)
