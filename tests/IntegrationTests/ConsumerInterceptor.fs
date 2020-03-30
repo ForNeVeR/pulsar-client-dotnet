@@ -168,7 +168,8 @@ let tests =
                     }:> Task)
 
             do! Task.WhenAll(producerTask, consumerTask) |> Async.AwaitTask
-            
+            do! Async.Sleep(110) // wait for acks
+
             let inMessagesIdSet = messageIds |> Set.ofSeq
             let ackMessagesIdSet = consumerInterceptor.AckMessageIds |> Seq.map id |> Set.ofSeq
 
