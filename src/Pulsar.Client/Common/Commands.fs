@@ -106,7 +106,8 @@ let getSchemaType (schemaType: SchemaType) =
 let getSchema (schemaInfo: ISchema<'T>) : Schema =
      Schema (
          Name = schemaInfo.Name,
-         ``type`` = getSchemaType schemaInfo.Type
+         ``type`` = getSchemaType schemaInfo.Type,
+         SchemaData = schemaInfo.SchemaData
      )
 //        .setName(schemaInfo.getName())
 //        .setSchemaData(copyFrom(schemaInfo.getSchema()))
@@ -166,8 +167,11 @@ let newLookup (topicName : CompleteTopicName) (requestId : RequestId) (authorita
     let command = BaseCommand(``type`` = CommandType.Lookup, lookupTopic = request)
     command |> serializeSimpleCommand
 
-let newProducer (topicName : CompleteTopicName) (producerName: string) (producerId : ProducerId) (requestId : RequestId) =
-    let request = CommandProducer(Topic = %topicName, ProducerId = %producerId, RequestId = %requestId, ProducerName = producerName)
+let newProducer (topicName : CompleteTopicName) (producerName: string) (producerId : ProducerId) (requestId : RequestId)
+                (schema: ISchema<'T>) (epoch: uint64) =
+    let schema = getSchema schema
+    let request = CommandProducer(Topic = %topicName, ProducerId = %producerId, RequestId = %requestId, ProducerName = producerName,
+                                  Schema = schema, Epoch = epoch)
     let command = BaseCommand(``type`` = CommandType.Producer, Producer = request)
     command |> serializeSimpleCommand
 

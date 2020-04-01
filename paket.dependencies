@@ -18,7 +18,6 @@ nuget zlib.net-mutliplatform
 nuget K4os.Compression.LZ4
 nuget Snappy.Standard
 nuget ZstdNet
-nuget Apache.Avro
 
 group Tests
   framework: netcoreapp3.1

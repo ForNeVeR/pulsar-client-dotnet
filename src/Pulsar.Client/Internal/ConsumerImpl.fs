@@ -52,7 +52,7 @@ type internal ConsumerImpl (consumerConfig: ConsumerConfiguration, clientConfig:
                           connectionPool,
                           lookup,
                           consumerConfig.Topic.CompleteTopicName,
-                          (fun () -> this.Mb.Post(ConsumerMessage.ConnectionOpened)),
+                          (fun _ -> this.Mb.Post(ConsumerMessage.ConnectionOpened)),
                           (fun ex -> this.Mb.Post(ConsumerMessage.ConnectionFailed ex)),
                           Backoff({ BackoffConfig.Default with Initial = TimeSpan.FromMilliseconds(100.0); Max = TimeSpan.FromSeconds(60.0) }))
 

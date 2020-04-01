@@ -15,7 +15,7 @@ open System.Runtime.InteropServices
 open System.Threading.Tasks
 
 type internal ProducerMessage<'T> =
-    | ConnectionOpened
+    | ConnectionOpened of uint64
     | ConnectionFailed of exn
     | ConnectionClosed of ClientCnx
     | AckReceived of SendReceipt
@@ -29,7 +29,8 @@ type internal ProducerMessage<'T> =
     | SendTimeoutTick
 
 type internal ProducerImpl<'T> private (producerConfig: ProducerConfiguration, clientConfig: PulsarClientConfiguration, connectionPool: ConnectionPool,
-                           partitionIndex: int, lookup: BinaryLookupService, interceptors: ProducerInterceptors<'T>, cleanup: ProducerImpl<'T> -> unit) as this =
+                           partitionIndex: int, lookup: BinaryLookupService, schema: ISchema<'T>,
+                           interceptors: ProducerInterceptors<'T>, cleanup: ProducerImpl<'T> -> unit) as this =
     let _this = this :> IProducer<'T>
     let producerId = Generators.getNextProducerId()
 
@@ -57,7 +58,7 @@ type internal ProducerImpl<'T> private (producerConfig: ProducerConfiguration, c
                           connectionPool,
                           lookup,
                           producerConfig.Topic.CompleteTopicName,
-                          (fun () -> this.Mb.Post(ProducerMessage.ConnectionOpened)),
+                          (fun epoch -> this.Mb.Post(ProducerMessage.ConnectionOpened epoch)),
                           (fun ex -> this.Mb.Post(ProducerMessage.ConnectionFailed ex)),
                           Backoff { BackoffConfig.Default with
                                         Initial = TimeSpan.FromMilliseconds(100.0)
@@ -217,7 +218,7 @@ type internal ProducerImpl<'T> private (producerConfig: ProducerConfiguration, c
                 let! msg = inbox.Receive()
                 match msg with
 
-                | ProducerMessage.ConnectionOpened ->
+                | ProducerMessage.ConnectionOpened epoch ->
 
                     match connectionHandler.ConnectionState with
                     | Ready clientCnx ->
@@ -226,7 +227,8 @@ type internal ProducerImpl<'T> private (producerConfig: ProducerConfiguration, c
                         clientCnx.AddProducer(producerId, producerOperations)
                         let requestId = Generators.getNextRequestId()
                         try
-                            let payload = Commands.newProducer producerConfig.Topic.CompleteTopicName producerConfig.ProducerName producerId requestId
+                            let payload = Commands.newProducer producerConfig.Topic.CompleteTopicName producerConfig.ProducerName
+                                              producerId requestId schema epoch
                             let! response = clientCnx.SendAndWaitForReply requestId payload |> Async.AwaitTask
                             let success = response |> PulsarResponseType.GetProducerSuccess
                             Log.Logger.LogInformation("{0} registered with name {1}", prefix, success.GeneratedProducerName)
@@ -488,7 +490,8 @@ type internal ProducerImpl<'T> private (producerConfig: ProducerConfiguration, c
                        partitionIndex: int, lookup: BinaryLookupService, schema: ISchema<'T>,
                        interceptors: ProducerInterceptors<'T>, cleanup: ProducerImpl<'T> -> unit) =
         task {
-            let producer = ProducerImpl(producerConfig, clientConfig, connectionPool, partitionIndex, lookup, interceptors, cleanup)
+            let producer = ProducerImpl(producerConfig, clientConfig, connectionPool, partitionIndex, lookup, schema,
+                                        interceptors, cleanup)
             do! producer.InitInternal()
             return producer :> IProducer<'T>
         }
@@ -526,7 +529,7 @@ type internal ProducerImpl<'T> private (producerConfig: ProducerConfiguration, c
             [<Optional; DefaultParameterValue(null:string)>]key:string,
             [<Optional; DefaultParameterValue(null:IReadOnlyDictionary<string,string>)>]properties: IReadOnlyDictionary<string, string>,
             [<Optional; DefaultParameterValue(Nullable():Nullable<int64>)>]deliverAt:Nullable<int64>) =
-            MessageBuilder(value, [||], key, properties, deliverAt) //TODO
+            MessageBuilder(value, schema.Encode(value), key, properties, deliverAt)
         
         member this.ProducerId = producerId
 

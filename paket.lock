@@ -2,12 +2,6 @@ STORAGE: NONE
 RESTRICTION: == netstandard2.0
 NUGET
   remote: https://api.nuget.org/v3/index.json
-    Apache.Avro (1.9.2)
-      Newtonsoft.Json (>= 10.0.3)
-      System.CodeDom (>= 4.4)
-      System.Reflection (>= 4.3)
-      System.Reflection.Emit.ILGeneration (>= 4.3)
-      System.Reflection.Emit.Lightweight (>= 4.3)
     FSharp.Control.AsyncSeq (2.0.23)
       FSharp.Core (>= 4.3.2)
     FSharp.Core (4.7.1)
@@ -46,7 +40,6 @@ NUGET
     Microsoft.NETCore.Targets (3.1)
     NETStandard.Library (2.0.3)
       Microsoft.NETCore.Platforms (>= 1.1)
-    Newtonsoft.Json (12.0.3)
     Pipelines.Sockets.Unofficial (2.1.1)
       System.Buffers (>= 4.5)
       System.IO.Pipelines (>= 4.7)
@@ -60,7 +53,6 @@ NUGET
     Snappy.Standard (0.2)
       NETStandard.Library (>= 1.6)
     System.Buffers (4.5.1)
-    System.CodeDom (4.7)
     System.Collections (4.3)
       Microsoft.NETCore.Platforms (>= 1.1)
       Microsoft.NETCore.Targets (>= 1.1)
