@@ -19,10 +19,11 @@ let main _ =
     PulsarClient.Logger <- loggerFactory.CreateLogger("PulsarLogger") 
 
     runSimple().Wait()
-    runCustomProps().Wait()
-    runReader().Wait()
-    runRealWorld(PulsarClient.Logger).Wait()
-    
+//    runTlsAuthentication().Wait()
+//    runCustomProps().Wait()
+//    runReader().Wait()
+//    runRealWorld(PulsarClient.Logger).Wait()
+
     printfn "Example ended. Press any key to exit"
     Console.ReadKey() |> ignore
 

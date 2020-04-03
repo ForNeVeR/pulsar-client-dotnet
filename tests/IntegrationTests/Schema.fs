@@ -1,6 +1,5 @@
 module Pulsar.Client.IntegrationTests.Schema
 
-open System.Threading.Tasks
 open Expecto
 open Expecto.Flip
 
@@ -8,8 +7,7 @@ open Serilog
 open Pulsar.Client.IntegrationTests.Common
 open System
 open System.Text
-open System.Text
-open FSharp.Control.Tasks.V2.ContextInsensitive
+open System.Text.Json
 open Pulsar.Client.Api
 
 [<CLIMutable>]
@@ -73,13 +71,13 @@ let tests =
                     .ReceiverQueueSize(10)
                     .SubscribeAsync() |> Async.AwaitTask
 
-            let sentText = "Hello schema"
-            let! _ = producer.SendAsync({ Name = "abc"; Age = 20  }) |> Async.AwaitTask
+            let input = { Name = "abc"; Age = 20  }
+            let! _ = producer.SendAsync(input) |> Async.AwaitTask
 
             let! msg = consumer.ReceiveAsync() |> Async.AwaitTask
-            let receivedText = msg.Data |> Encoding.UTF8.GetString
+            let output = JsonSerializer.Deserialize<SimpleRecord>(ReadOnlySpan msg.Data)
 
-            Expect.equal "" sentText receivedText
+            Expect.equal "" input output
 
             Log.Debug("Finished String schema works fine")
         }

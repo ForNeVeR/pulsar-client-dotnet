@@ -9,6 +9,7 @@ open FSharp.UMX
 open System
 open System.IO
 open ProtoBuf
+open Pulsar.Client.Api
 open System.Threading.Tasks
 
 module CommandsTests =
@@ -127,7 +128,7 @@ module CommandsTests =
                 let requestId = %1UL
 
                 let totalSize, commandSize, command =
-                    serializeDeserializeSimpleCommand (newProducer topicName producerName producerId requestId)
+                    serializeDeserializeSimpleCommand (newProducer topicName producerName producerId requestId (Schema.BYTES()) 0UL)
 
                 totalSize |> Expect.equal "" 39
                 commandSize |> Expect.equal "" 35
