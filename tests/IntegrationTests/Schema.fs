@@ -31,14 +31,12 @@ let tests =
             let! producer =
                 client.NewProducer(Schema.STRING())
                     .Topic(topicName)
-                    .EnableBatching(false)
                     .CreateAsync() |> Async.AwaitTask
 
             let! consumer =
                 client.NewConsumer()
                     .Topic(topicName)
                     .SubscriptionName("test-subscription")
-                    .ReceiverQueueSize(10)
                     .SubscribeAsync() |> Async.AwaitTask
 
             let sentText = "Hello schema"
@@ -52,7 +50,7 @@ let tests =
             Log.Debug("Finished String schema works fine")
         }
         
-        ftestAsync "Json schema works fine" {
+        testAsync "Json schema works fine" {
 
             Log.Debug("Start Json schema works fine")
             let client = getClient()
@@ -68,7 +66,6 @@ let tests =
                 client.NewConsumer()
                     .Topic(topicName)
                     .SubscriptionName("test-subscription")
-                    .ReceiverQueueSize(10)
                     .SubscribeAsync() |> Async.AwaitTask
 
             let input = { Name = "abc"; Age = 20  }
@@ -79,7 +76,7 @@ let tests =
 
             Expect.equal "" input output
 
-            Log.Debug("Finished String schema works fine")
+            Log.Debug("Finished Json schema works fine")
         }
     ]
     

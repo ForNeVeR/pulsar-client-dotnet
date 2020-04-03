@@ -130,8 +130,8 @@ module CommandsTests =
                 let totalSize, commandSize, command =
                     serializeDeserializeSimpleCommand (newProducer topicName producerName producerId requestId (Schema.BYTES()) 0UL)
 
-                totalSize |> Expect.equal "" 39
-                commandSize |> Expect.equal "" 35
+                totalSize |> Expect.equal "" 54
+                commandSize |> Expect.equal "" 50
                 command.``type``  |> Expect.equal "" CommandType.Producer
                 command.Producer.Topic |> Expect.equal "" %topicName
                 command.Producer.RequestId |> Expect.equal "" %requestId

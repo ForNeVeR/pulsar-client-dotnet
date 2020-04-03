@@ -1,5 +1,6 @@
 namespace Pulsar.Client.Api
 
+open System.Runtime.InteropServices
 open Pulsar.Client.Schema
 open Pulsar.Client.Schema
 open System.Text
@@ -10,11 +11,9 @@ type Schema =
         BytesSchema() :> ISchema<byte[]>
     static member BOOL() =
         BooleanSchema() :> ISchema<bool>
-    static member STRING () =
-        StringSchema(Encoding.UTF8) :> ISchema<string>
-    static member STRING (charset: Encoding) =
-        StringSchema(charset) :> ISchema<string>
-        
+    static member STRING ([<Optional; DefaultParameterValue(null:Encoding)>]charset: Encoding) =
+        let charset = if isNull charset then Encoding.UTF8 else charset
+        StringSchema(charset) :> ISchema<string>        
     static member JSON<'T> () =
         JsonSchema<'T>() :> ISchema<'T>
         
