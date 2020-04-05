@@ -1,9 +1,8 @@
 namespace Pulsar.Client.Api
 
-
-//type KeyValueEncodingType =
-//    | SEPARATED = 0
-//    | INLINE = 1
+type KeyValueEncodingType =
+    | SEPARATED = 0
+    | INLINE = 1
 
 type SchemaType =
     | NONE = 0

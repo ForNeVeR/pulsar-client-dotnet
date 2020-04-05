@@ -2,7 +2,6 @@ namespace Pulsar.Client.Api
 
 open System.Runtime.InteropServices
 open Pulsar.Client.Schema
-open Pulsar.Client.Schema
 open System.Text
 
 [<AbstractClass>]
@@ -16,7 +15,10 @@ type Schema =
         StringSchema(charset) :> ISchema<string>        
     static member JSON<'T> () =
         JsonSchema<'T>() :> ISchema<'T>
+    static member PROTOBUF<'T> () =
+        ProtobufSchema<'T>() :> ISchema<'T>
+    static member AVRO<'T> () =
+        AvroSchema<'T>() :> ISchema<'T>
         
-        
-//    let JSON<'T> = Schema<'T>.Json
-//    let KEY_VALUE<'K,'V> kvType = Schema<KeyValuePair<'K, 'V>>.KeyValue kvType
+//    static member KEY_VALUE<'K,'V> kvType =
+//        Schema<KeyValuePair<'K, 'V>>.KeyValue kvType

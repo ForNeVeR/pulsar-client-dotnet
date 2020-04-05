@@ -21,6 +21,7 @@ type internal PartitionedTopicMetadata =
 type internal ProducerSuccess =
     {
         GeneratedProducerName: string
+        SchemaVersion: byte[]
     }
 
 type internal LookupTopicResult =

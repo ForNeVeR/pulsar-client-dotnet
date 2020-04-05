@@ -5,9 +5,9 @@ open System.Text.Json
 open Pulsar.Client.Api
 open SharpPulsar.Impl.Schema
 
-type JsonSchema<'T>() =
+type ProtobufSchema<'T>() =
     let options = JsonSerializerOptions(IgnoreNullValues = true)
-    let stringSchema = typeof<'T>.GetSchema()
+    let stringSchema = typeof<'T>.GetSchema()      
     
     interface ISchema<'T> with
         member this.Name = ""

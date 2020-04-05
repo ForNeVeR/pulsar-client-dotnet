@@ -90,6 +90,9 @@
     <Compile Include="Schema\BooleanSchema.fs" />
     <Compile Include="Schema\StringSchema.fs" />
     <Compile Include="Schema\JsonSchema.fs" />
+    <Compile Include="Schema\KeyValueSchema.fs" />
+    <Compile Include="Schema\ProtobufSchema.fs" />
+    <Compile Include="Schema\AvroSchema.fs" />
     <Compile Include="Schema\Schema.fs" />
     <Compile Include="Api\AuthenticationFactory.fs" />
     <Compile Include="Api\Reader.fs" />

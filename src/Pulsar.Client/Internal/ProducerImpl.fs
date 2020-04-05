@@ -37,6 +37,7 @@ type internal ProducerImpl<'T> private (producerConfig: ProducerConfiguration, c
     let prefix = sprintf "producer(%u, %s, %i)" %producerId producerConfig.ProducerName partitionIndex
     let producerCreatedTsc = TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously)
     let mutable maxMessageSize = Commands.DEFAULT_MAX_MESSAGE_SIZE
+    let mutable schemaVersion = None
 
     let pendingMessages = Queue<PendingMessage<'T>>()
 
@@ -44,12 +45,12 @@ type internal ProducerImpl<'T> private (producerConfig: ProducerConfiguration, c
 
     let protoCompressionType =
         match producerConfig.CompressionType with
-            | CompressionType.None -> pulsar.proto.CompressionType.None
-            | CompressionType.ZLib -> pulsar.proto.CompressionType.Zlib
-            | CompressionType.LZ4 -> pulsar.proto.CompressionType.Lz4
-            | CompressionType.ZStd -> pulsar.proto.CompressionType.Zstd
-            | CompressionType.Snappy -> pulsar.proto.CompressionType.Snappy
-            | _ -> pulsar.proto.CompressionType.None
+        | CompressionType.None -> pulsar.proto.CompressionType.None
+        | CompressionType.ZLib -> pulsar.proto.CompressionType.Zlib
+        | CompressionType.LZ4 -> pulsar.proto.CompressionType.Lz4
+        | CompressionType.ZStd -> pulsar.proto.CompressionType.Zstd
+        | CompressionType.Snappy -> pulsar.proto.CompressionType.Snappy
+        | _ -> pulsar.proto.CompressionType.None
 
     let createProducerTimeout = DateTime.Now.Add(clientConfig.OperationTimeout)
     let sendTimeoutMs = producerConfig.SendTimeout.TotalMilliseconds
@@ -154,6 +155,8 @@ type internal ProducerImpl<'T> private (producerConfig: ProducerConfiguration, c
             metadata.NumMessagesInBatch <- numMessagesInBatch.Value
         if message.DeliverAt.HasValue then
             metadata.DeliverAtTime <- message.DeliverAt.Value
+        if schemaVersion.IsSome then
+            metadata.SchemaVersion <- schemaVersion.Value
 
         metadata
 
@@ -232,6 +235,7 @@ type internal ProducerImpl<'T> private (producerConfig: ProducerConfiguration, c
                             let! response = clientCnx.SendAndWaitForReply requestId payload |> Async.AwaitTask
                             let success = response |> PulsarResponseType.GetProducerSuccess
                             Log.Logger.LogInformation("{0} registered with name {1}", prefix, success.GeneratedProducerName)
+                            schemaVersion <- Option.ofObj success.SchemaVersion
                             connectionHandler.ResetBackoff()
                             if producerConfig.BatchingEnabled then
                                 startSendBatchTimer()
