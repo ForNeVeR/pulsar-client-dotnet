@@ -315,12 +315,15 @@ and internal ClientCnx (config: PulsarClientConfiguration,
             CompressionType = messageMetadata.Compression |> mapCompressionType
             UncompressedMessageSize = messageMetadata.UncompressedSize |> int32
         }
+  
+            
         MessageReceived {
             MessageId = { LedgerId = %(int64 cmd.MessageId.ledgerId); EntryId = %(int64 cmd.MessageId.entryId); Type = Individual; Partition = -1; TopicName = %"" }
             RedeliveryCount = cmd.RedeliveryCount
             Metadata = medadata
             Payload = payload
-            MessageKey = %messageMetadata.PartitionKey
+            MessageKey = messageMetadata.PartitionKey
+            IsKeyBase64Encoded = messageMetadata.PartitionKeyB64Encoded
             Properties =
                 if messageMetadata.Properties.Count > 0 then
                     messageMetadata.Properties

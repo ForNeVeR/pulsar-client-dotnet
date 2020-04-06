@@ -34,10 +34,10 @@ type ProducerInterceptorBefore() =
         member this.Eligible(_) = true
         
         member this.BeforeSend(producer, message) =
-            let msgValue = message.Value |> Encoding.UTF8.GetString
+            let msgValue = message.Value |> Encoding.UTF8.GetString    
             let newProp = Dictionary(message.Properties)
             newProp.Add("BeforeSend", msgValue)
-            producer.NewMessage(message.Value, %message.Key, newProp, message.DeliverAt)
+            producer.NewMessage(message.Value, message.Key.GetKey(), newProp, message.DeliverAt)
         
         member this.OnSendAcknowledgement(_, _, _, _) = ()
 

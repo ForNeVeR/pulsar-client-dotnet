@@ -49,7 +49,7 @@ type internal DeadLettersProcessor
                 | true, message ->
                     Log.Logger.LogInformation("DeadLetter processing topic: {0}, messageId: {1}", topicName, messageId)
                     try
-                        let mb = MessageBuilder<byte[]>(message.Data, message.Data, message.Key, message.Properties)
+                        let mb = MessageBuilder<byte[]>(message.Data, message.Data, Plain message.Key, message.Properties)
                         do! sendMessage mb
                         do! acknowledge messageId
                         return true

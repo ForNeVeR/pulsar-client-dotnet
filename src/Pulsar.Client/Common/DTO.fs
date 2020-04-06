@@ -168,13 +168,22 @@ type internal Metadata =
         UncompressedMessageSize: int32
     }
 
+type MessageKey =
+    | Plain of string
+    | Base64Encoded of string
+    member this.GetKey() =
+        match this with
+        | Plain key -> key
+        | Base64Encoded key -> key
+
 type internal RawMessage =
     {
         MessageId: MessageId    
         Metadata: Metadata
         RedeliveryCount: uint32
         Payload: byte[]
-        MessageKey: MessageKey
+        MessageKey: string
+        IsKeyBase64Encoded: bool
         Properties: IReadOnlyDictionary<string, string>
     }
 
@@ -183,6 +192,7 @@ type Message =
         MessageId: MessageId
         Data: byte[]
         Key: string
+        IsKeyBase64Encoded: bool
         Properties: IReadOnlyDictionary<string, string>
     }
 
@@ -231,23 +241,12 @@ type MessageBuilder<'T> =
     val Properties: IReadOnlyDictionary<string, string>
     val DeliverAt: Nullable<int64>
 
-    /// <summary>
-    ///     Constructs <see cref="Pulsar.Client.Common.MessageBuilder" />
-    /// </summary>
-    /// <param name="value">Message data</param>
-    /// <param name="properties">The readonly dictionary with message properties.</param>
-    /// <param name="deliverAt">Unix timestamp in milliseconds after which message should be delivered to consumer(s).</param>
-    /// <remarks>
-    ///     This <paramref name="deliverAt" /> timestamp must be expressed as unix time milliseconds based on UTC.
-    ///     For example: <code>DateTimeOffset.UtcNow.AddSeconds(2.0).ToUnixTimeMilliseconds()</code>.
-    /// </remarks>
-    internal new (value : 'T, payload: byte[],
-            [<Optional; DefaultParameterValue(null:string)>] key : string,
+    internal new (value : 'T, payload: byte[], key : MessageKey,
             [<Optional; DefaultParameterValue(null:IReadOnlyDictionary<string, string>)>] properties : IReadOnlyDictionary<string, string>,
             [<Optional; DefaultParameterValue(Nullable():Nullable<int64>)>] deliverAt : Nullable<int64>) =
             {
                 Value = value
-                Key = if isNull key then %"" else %key
+                Key = key
                 Properties = if isNull properties then EmptyProps else properties
                 DeliverAt = deliverAt
                 Payload = payload

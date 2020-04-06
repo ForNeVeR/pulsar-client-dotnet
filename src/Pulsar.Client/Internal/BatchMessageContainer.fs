@@ -20,8 +20,15 @@ module internal BatchHelpers =
             |> Seq.mapi (fun index batchItem ->
                 let message = batchItem.Message
                 let smm = SingleMessageMetadata(PayloadSize = message.Payload.Length)
-                if String.IsNullOrEmpty(%message.Key) |> not then
-                    smm.PartitionKey <- %message.Key
+                match message.Key with
+                | Plain key when (String.IsNullOrEmpty(key) |> not) ->
+                    smm.PartitionKey <- key
+                    smm.PartitionKeyB64Encoded <- false
+                | Base64Encoded key when (String.IsNullOrEmpty(key) |> not) ->
+                    smm.PartitionKey <- key
+                    smm.PartitionKeyB64Encoded <- true
+                | _ ->
+                    ()
                 if message.Properties.Count > 0 then
                     for property in message.Properties do
                         smm.Properties.Add(KeyValue(Key = property.Key, Value = property.Value))

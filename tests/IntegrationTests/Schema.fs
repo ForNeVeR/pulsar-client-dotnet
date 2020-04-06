@@ -6,6 +6,8 @@ open Expecto.Flip
 open Serilog
 open Pulsar.Client.IntegrationTests.Common
 open System
+open System.Collections.Generic
+open System.Collections.Generic
 open System.Text
 open System.Text.Json
 open Pulsar.Client.Api
@@ -77,6 +79,33 @@ let tests =
             Expect.equal "" input output
 
             Log.Debug("Finished Json schema works fine")
+        }
+        
+        ftestAsync "KeyValue schema works fine" {
+
+            Log.Debug("Start KeyValue schema works fine")
+            let client = getClient()
+            let topicName = "public/default/topic-" + Guid.NewGuid().ToString("N")
+
+            let! producer =
+                client.NewProducer(Schema.KEY_VALUE(Schema.BOOL(), Schema.STRING(), KeyValueEncodingType.SEPARATED))
+                    .Topic(topicName)
+                    .EnableBatching(false)
+                    .CreateAsync() |> Async.AwaitTask
+
+            let! consumer =
+                client.NewConsumer()
+                    .Topic(topicName)
+                    .SubscriptionName("test-subscription")
+                    .SubscribeAsync() |> Async.AwaitTask
+
+            let! _ = producer.SendAsync(KeyValuePair(true, "one")) |> Async.AwaitTask
+
+            let! msg = consumer.ReceiveAsync() |> Async.AwaitTask
+
+            Expect.equal "" msg.Data [||]
+
+            Log.Debug("Finished KeyValue schema works fine")
         }
     ]
     

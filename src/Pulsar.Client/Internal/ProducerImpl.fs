@@ -6,13 +6,14 @@ open FSharp.UMX
 open pulsar.proto
 open Pulsar.Client.Common
 open Pulsar.Client.Internal
+open Pulsar.Client.Schema
 open System
 open Microsoft.Extensions.Logging
+open System.Collections.Generic
 open System.Collections.Generic
 open System.Timers
 open System.IO
 open System.Runtime.InteropServices
-open System.Threading.Tasks
 
 type internal ProducerMessage<'T> =
     | ConnectionOpened of uint64
@@ -145,9 +146,15 @@ type internal ProducerImpl<'T> private (producerConfig: ProducerConfiguration, c
             )
         if protoCompressionType <> pulsar.proto.CompressionType.None then
             metadata.Compression <- protoCompressionType
-        if String.IsNullOrEmpty(%message.Key) |> not then
-            metadata.PartitionKey <- %message.Key
+        match message.Key with
+        | Plain key when (String.IsNullOrEmpty(key) |> not) ->
+            metadata.PartitionKey <- key
             metadata.PartitionKeyB64Encoded <- false
+        | Base64Encoded key when (String.IsNullOrEmpty(key) |> not) ->
+            metadata.PartitionKey <- key
+            metadata.PartitionKeyB64Encoded <- true
+        | _ ->
+            ()
         if message.Properties.Count > 0 then
             for property in message.Properties do
                 metadata.Properties.Add(KeyValue(Key = property.Key, Value = property.Value))
@@ -162,7 +169,7 @@ type internal ProducerImpl<'T> private (producerConfig: ProducerConfiguration, c
 
     let sendOneBatch (batchPayload: byte[], batchCallbacks: BatchCallback<'T>[]) =
         let batchSize = batchCallbacks.Length
-        let msgBuilder = MessageBuilder(batchPayload, batchPayload)
+        let msgBuilder = MessageBuilder(batchPayload, batchPayload, Plain null)
         let metadata = createMessageMetadata msgBuilder (Some batchSize)
         let sequenceId = %metadata.SequenceId
         let encodedBatchPayload = compressionCodec.Encode msgBuilder.Payload
@@ -533,8 +540,19 @@ type internal ProducerImpl<'T> private (producerConfig: ProducerConfiguration, c
             [<Optional; DefaultParameterValue(null:string)>]key:string,
             [<Optional; DefaultParameterValue(null:IReadOnlyDictionary<string,string>)>]properties: IReadOnlyDictionary<string, string>,
             [<Optional; DefaultParameterValue(Nullable():Nullable<int64>)>]deliverAt:Nullable<int64>) =
-            MessageBuilder(value, schema.Encode(value), key, properties, deliverAt)
-        
+            
+            if schema.Type = SchemaType.KEY_VALUE then
+                let kvSchema = schema :?> KeyValueSchema<'K, 'V>
+                let (KeyValue(k, v)) = value |> box :?> KeyValuePair<'K,'V>
+                if kvSchema.KeyValueEncodingType = KeyValueEncodingType.SEPARATED then
+                    let strKey = kvSchema.KeySchema.Encode(k) |> Convert.ToBase64String |> Base64Encoded
+                    let content = kvSchema.ValueSchema.Encode(v)
+                    MessageBuilder(value, content, strKey, properties, deliverAt)
+                else
+                    MessageBuilder(value, schema.Encode(value), Plain key, properties, deliverAt)
+            else
+                MessageBuilder(value, schema.Encode(value), Plain key, properties, deliverAt)
+                
         member this.ProducerId = producerId
 
         member this.Topic = %producerConfig.Topic.CompleteTopicName
