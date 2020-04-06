@@ -102,8 +102,12 @@ let tests =
             let! _ = producer.SendAsync(KeyValuePair(true, "one")) |> Async.AwaitTask
 
             let! msg = consumer.ReceiveAsync() |> Async.AwaitTask
-
-            Expect.equal "" msg.Data [||]
+            let receivedValue = msg.Data |> Encoding.UTF8.GetString
+            let receiveKey = msg.Key |> Convert.FromBase64String 
+            
+            Expect.isTrue "" msg.IsKeyBase64Encoded
+            Expect.equal "" "one" receivedValue
+            Expect.sequenceEqual "" receiveKey [| 1uy |]
 
             Log.Debug("Finished KeyValue schema works fine")
         }

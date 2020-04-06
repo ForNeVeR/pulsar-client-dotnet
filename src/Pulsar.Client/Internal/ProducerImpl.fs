@@ -10,7 +10,6 @@ open Pulsar.Client.Schema
 open System
 open Microsoft.Extensions.Logging
 open System.Collections.Generic
-open System.Collections.Generic
 open System.Timers
 open System.IO
 open System.Runtime.InteropServices
@@ -29,12 +28,40 @@ type internal ProducerMessage<'T> =
     | SendBatchTick
     | SendTimeoutTick
 
+type IKeyValueProcessor<'T> =
+    abstract member GetKeyValue: 'T -> (MessageKey * byte[]) option        
+
+type KeyValueProcessor<'T,'K,'V>(schema: ISchema<'T>) =
+    interface IKeyValueProcessor<'T> with
+        member this.GetKeyValue value =
+            let kvSchema = schema :?> KeyValueSchema<'K, 'V>
+            let (KeyValue(k, v)) = (box value) :?> KeyValuePair<'K,'V>
+            if kvSchema.KeyValueEncodingType = KeyValueEncodingType.SEPARATED then
+                let strKey = kvSchema.KeySchema.Encode(k) |> Convert.ToBase64String |> Base64Encoded
+                let content = kvSchema.ValueSchema.Encode(v)
+                Some (strKey, content)
+            else
+                None
+
 type internal ProducerImpl<'T> private (producerConfig: ProducerConfiguration, clientConfig: PulsarClientConfiguration, connectionPool: ConnectionPool,
                            partitionIndex: int, lookup: BinaryLookupService, schema: ISchema<'T>,
                            interceptors: ProducerInterceptors<'T>, cleanup: ProducerImpl<'T> -> unit) as this =
     let _this = this :> IProducer<'T>
     let producerId = Generators.getNextProducerId()
 
+    let getKVP() =
+        let kvType = typeof<'T>
+        let kvpTypeTemplate = typedefof<KeyValueProcessor<_,_,_>>
+        let kvpType = kvpTypeTemplate.MakeGenericType [| kvType; yield! kvType.GetGenericArguments() |]
+        let obj = Activator.CreateInstance(kvpType, schema)
+        (obj :?> IKeyValueProcessor<'T>)
+    
+    let keyValueProcessor: IKeyValueProcessor<'T> option =
+        if schema.Type = SchemaType.KEY_VALUE then
+            getKVP() |> Some
+        else
+            None
+    
     let prefix = sprintf "producer(%u, %s, %i)" %producerId producerConfig.ProducerName partitionIndex
     let producerCreatedTsc = TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously)
     let mutable maxMessageSize = Commands.DEFAULT_MAX_MESSAGE_SIZE
@@ -542,13 +569,10 @@ type internal ProducerImpl<'T> private (producerConfig: ProducerConfiguration, c
             [<Optional; DefaultParameterValue(Nullable():Nullable<int64>)>]deliverAt:Nullable<int64>) =
             
             if schema.Type = SchemaType.KEY_VALUE then
-                let kvSchema = schema :?> KeyValueSchema<'K, 'V>
-                let (KeyValue(k, v)) = value |> box :?> KeyValuePair<'K,'V>
-                if kvSchema.KeyValueEncodingType = KeyValueEncodingType.SEPARATED then
-                    let strKey = kvSchema.KeySchema.Encode(k) |> Convert.ToBase64String |> Base64Encoded
-                    let content = kvSchema.ValueSchema.Encode(v)
-                    MessageBuilder(value, content, strKey, properties, deliverAt)
-                else
+                match keyValueProcessor.Value.GetKeyValue(value) with
+                | Some (k, v) ->
+                    MessageBuilder(value, v, k, properties, deliverAt)
+                | None ->
                     MessageBuilder(value, schema.Encode(value), Plain key, properties, deliverAt)
             else
                 MessageBuilder(value, schema.Encode(value), Plain key, properties, deliverAt)
