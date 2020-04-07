@@ -43,7 +43,7 @@ type KeyValueSchema<'K,'V>(keySchema: ISchema<'K>, valueSchema: ISchema<'V>, kvT
                 failwith "Unsupported KeyValueEncodingType"
 
 type internal IKeyValueProcessor =
-    abstract member GetKeyValue: obj -> struct(MessageKey * byte[])
+    abstract member GetKeyValue: obj -> struct(string * byte[])
     abstract member EncodingType: KeyValueEncodingType
 
 type internal KeyValueProcessor<'K,'V>(schema: KeyValueSchema<'K,'V>) =
@@ -51,7 +51,7 @@ type internal KeyValueProcessor<'K,'V>(schema: KeyValueSchema<'K,'V>) =
     interface IKeyValueProcessor with
         member this.GetKeyValue value =
             let (KeyValue(k, v)) = value :?> KeyValuePair<'K,'V>
-            let strKey = schema.KeySchema.Encode(k) |> Convert.ToBase64String |> Base64Encoded
+            let strKey = schema.KeySchema.Encode(k) |> Convert.ToBase64String
             let content = schema.ValueSchema.Encode(v)
             struct(strKey, content)
                 

@@ -263,7 +263,7 @@ type internal PartitionedProducerImpl<'T> private (producerConfig: ProducerConfi
             
             keyValueProcessor
             |> ValueOption.map(fun kvp -> kvp.GetKeyValue value)
-            |> ValueOption.map(fun struct(k, v) -> MessageBuilder(value, v, k, properties, deliverAt))
+            |> ValueOption.map(fun struct(k, v) -> MessageBuilder(value, v, Base64Encoded k, properties, deliverAt))
             |> ValueOption.defaultValue (MessageBuilder(value, schema.Encode(value), Plain key, properties, deliverAt))
 
         member this.ProducerId = producerId
