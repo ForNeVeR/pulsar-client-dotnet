@@ -81,7 +81,7 @@ let tests =
             Log.Debug("Finished Json schema works fine")
         }
         
-        ftestAsync "KeyValue schema works fine" {
+        testAsync "KeyValue schema works fine" {
 
             Log.Debug("Start KeyValue schema works fine")
             let client = getClient()

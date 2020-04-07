@@ -1,5 +1,6 @@
 namespace Pulsar.Client.Schema
 
+open System
 open System.Collections.Generic
 open System.IO
 open Pulsar.Client.Api
@@ -41,3 +42,33 @@ type KeyValueSchema<'K,'V>(keySchema: ISchema<'K>, valueSchema: ISchema<'V>, kvT
             | _ ->
                 failwith "Unsupported KeyValueEncodingType"
 
+type internal IKeyValueProcessor =
+    abstract member GetKeyValue: obj -> struct(MessageKey * byte[])
+    abstract member EncodingType: KeyValueEncodingType
+
+type internal KeyValueProcessor<'K,'V>(schema: KeyValueSchema<'K,'V>) =
+    
+    interface IKeyValueProcessor with
+        member this.GetKeyValue value =
+            let (KeyValue(k, v)) = value :?> KeyValuePair<'K,'V>
+            let strKey = schema.KeySchema.Encode(k) |> Convert.ToBase64String |> Base64Encoded
+            let content = schema.ValueSchema.Encode(v)
+            struct(strKey, content)
+                
+        member this.EncodingType =
+            schema.KeyValueEncodingType
+                
+type internal KeyValueProcessor =
+    static member GetInstance (schema: ISchema<'T>) =
+        if schema.Type = SchemaType.KEY_VALUE then
+            let kvType = typeof<'T>
+            let kvpTypeTemplate = typedefof<KeyValueProcessor<_,_>>
+            let kvpType = kvpTypeTemplate.MakeGenericType(kvType.GetGenericArguments())
+            let obj = Activator.CreateInstance(kvpType, schema)
+            let kvp = (obj :?> IKeyValueProcessor)
+            if kvp.EncodingType = KeyValueEncodingType.SEPARATED then
+                ValueSome kvp
+            else
+                ValueNone
+        else
+            ValueNone

@@ -31,6 +31,9 @@ type internal PartitionedProducerImpl<'T> private (producerConfig: ProducerConfi
     let _this = this :> IProducer<'T>
     let producerId = Generators.getNextProducerId()
     let prefix = sprintf "p/producer(%u, %s)" %producerId producerConfig.ProducerName
+    
+    let keyValueProcessor: IKeyValueProcessor voption = KeyValueProcessor.GetInstance schema
+    
     let producers = ResizeArray<IProducer<'T>>(numPartitions)
     let producerCreatedTsc = TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously)
     let maxPendingMessages = Math.Min(producerConfig.MaxPendingMessages, producerConfig.MaxPendingMessagesAcrossPartitions / numPartitions)
@@ -258,17 +261,10 @@ type internal PartitionedProducerImpl<'T> private (producerConfig: ProducerConfi
             [<Optional; DefaultParameterValue(null:IReadOnlyDictionary<string,string>)>]properties: IReadOnlyDictionary<string, string>,
             [<Optional; DefaultParameterValue(Nullable():Nullable<int64>)>]deliverAt:Nullable<int64>) =
             
-            if schema.Type = SchemaType.KEY_VALUE then
-                let kvSchema = schema :?> KeyValueSchema<'K, 'V>
-                let (KeyValue(k, v)) = value |> box :?> KeyValuePair<'K,'V>
-                if kvSchema.KeyValueEncodingType = KeyValueEncodingType.SEPARATED then
-                    let strKey = kvSchema.KeySchema.Encode(k) |> Convert.ToBase64String |> Base64Encoded
-                    let content = kvSchema.ValueSchema.Encode(v)
-                    MessageBuilder(value, content, strKey, properties, deliverAt)
-                else
-                    MessageBuilder(value, schema.Encode(value), Plain key, properties, deliverAt)
-            else
-                MessageBuilder(value, schema.Encode(value), Plain key, properties, deliverAt)
+            keyValueProcessor
+            |> ValueOption.map(fun kvp -> kvp.GetKeyValue value)
+            |> ValueOption.map(fun struct(k, v) -> MessageBuilder(value, v, k, properties, deliverAt))
+            |> ValueOption.defaultValue (MessageBuilder(value, schema.Encode(value), Plain key, properties, deliverAt))
 
         member this.ProducerId = producerId
 
