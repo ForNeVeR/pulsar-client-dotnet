@@ -169,12 +169,10 @@ type internal Metadata =
     }
 
 type MessageKey =
-    | Plain of string
-    | Base64Encoded of string
-    member this.GetKey() =
-        match this with
-        | Plain key -> key
-        | Base64Encoded key -> key
+    {
+        PartitionKey: PartitionKey
+        IsBase64Encoded: bool
+    }
 
 type internal RawMessage =
     {
@@ -191,7 +189,7 @@ type Message =
     {
         MessageId: MessageId
         Data: byte[]
-        Key: string
+        Key: PartitionKey
         IsKeyBase64Encoded: bool
         Properties: IReadOnlyDictionary<string, string>
     }
@@ -237,11 +235,11 @@ type Messages internal(maxNumberOfMessages: int, maxSizeOfMessages: int64) =
 type MessageBuilder<'T> =
     val Value: 'T
     val Payload: byte[]
-    val Key: MessageKey
+    val Key: MessageKey option
     val Properties: IReadOnlyDictionary<string, string>
     val DeliverAt: Nullable<int64>
 
-    internal new (value : 'T, payload: byte[], key : MessageKey,
+    internal new (value : 'T, payload: byte[], key : MessageKey option,
             [<Optional; DefaultParameterValue(null:IReadOnlyDictionary<string, string>)>] properties : IReadOnlyDictionary<string, string>,
             [<Optional; DefaultParameterValue(Nullable():Nullable<int64>)>] deliverAt : Nullable<int64>) =
             {

@@ -7,6 +7,7 @@ open System.Collections.Generic
 open System.Threading.Tasks
 open Microsoft.Extensions.Logging
 open FSharp.Control.Tasks.V2.ContextInsensitive
+open FSharp.UMX
 
 type internal DeadLettersProcessor
     (policy: DeadLettersPolicy,
@@ -26,13 +27,6 @@ type internal DeadLettersProcessor
         createProducer topicName
     )
 
-    let sendMessage (builder: MessageBuilder<byte[]>) =
-        task {
-            let! p = producer.Value
-            let! _ = p.SendAsync(builder.Payload)
-            return ()
-        }
-
     interface IDeadLettersProcessor with
         member this.ClearMessages() =
             store.Clear()
@@ -49,8 +43,14 @@ type internal DeadLettersProcessor
                 | true, message ->
                     Log.Logger.LogInformation("DeadLetter processing topic: {0}, messageId: {1}", topicName, messageId)
                     try
-                        let mb = MessageBuilder<byte[]>(message.Data, message.Data, Plain message.Key, message.Properties)
-                        do! sendMessage mb
+                        let! producer = producer.Value
+                        let key =
+                            if String.IsNullOrEmpty(%message.Key) then
+                                Some { PartitionKey = message.Key; IsBase64Encoded =  message.IsKeyBase64Encoded  }
+                            else
+                                None
+                        let msg = MessageBuilder(message.Data, message.Data, key, message.Properties)
+                        let! _ = producer.SendAsync(msg)
                         do! acknowledge messageId
                         return true
                     with

@@ -319,7 +319,7 @@ type internal ConsumerImpl (consumerConfig: ConsumerConfiguration, clientConfig:
                                 |> readOnlyDict
                             else
                                 EmptyProps
-                        Key = singleMessageMetadata.PartitionKey
+                        Key = %singleMessageMetadata.PartitionKey
                         IsKeyBase64Encoded = singleMessageMetadata.PartitionKeyB64Encoded
                         Data = singleMessagePayload
                     }
@@ -529,7 +529,7 @@ type internal ConsumerImpl (consumerConfig: ConsumerConfiguration, clientConfig:
                                 let message = {
                                     MessageId = msgId
                                     Data = getDecompressPayload rawMessage
-                                    Key = rawMessage.MessageKey
+                                    Key = %rawMessage.MessageKey
                                     IsKeyBase64Encoded = rawMessage.IsKeyBase64Encoded
                                     Properties = rawMessage.Properties
                                 }

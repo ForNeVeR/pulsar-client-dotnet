@@ -10,6 +10,7 @@ open Serilog
 open Microsoft.Extensions.Logging
 open Microsoft.Extensions.DependencyInjection
 open Serilog.Sinks.SystemConsole.Themes
+open FSharp.UMX
 
 
 [<Literal>]
@@ -134,8 +135,8 @@ let consumeMessagesWithProps (consumer: IConsumer) number consumerName =
             let expected = "Message #" + string i
             if received.StartsWith(expected) |> not then
                 failwith <| sprintf "Incorrect message expected %s received %s consumer %s" expected received consumerName
-            if message.Key <> i.ToString() then
-                failwith <| sprintf "Incorrect message key expected %i received %s consumer %s" i message.Key consumerName
+            if message.Key <> %(i.ToString()) then
+                failwith <| sprintf "Incorrect message key expected %i received %s consumer %s" i %message.Key consumerName
             if (message.Properties.Count = 2
                 && message.Properties.["prop1"] = i.ToString()
                 && message.Properties.["prop2"] = i.ToString()) |> not then

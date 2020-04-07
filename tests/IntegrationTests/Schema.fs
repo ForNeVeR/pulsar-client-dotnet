@@ -2,15 +2,14 @@ module Pulsar.Client.IntegrationTests.Schema
 
 open Expecto
 open Expecto.Flip
-
 open Serilog
 open Pulsar.Client.IntegrationTests.Common
 open System
 open System.Collections.Generic
-open System.Collections.Generic
 open System.Text
 open System.Text.Json
 open Pulsar.Client.Api
+open FSharp.UMX
 
 [<CLIMutable>]
 type SimpleRecord =
@@ -103,7 +102,7 @@ let tests =
 
             let! msg = consumer.ReceiveAsync() |> Async.AwaitTask
             let receivedValue = msg.Data |> Encoding.UTF8.GetString
-            let receiveKey = msg.Key |> Convert.FromBase64String 
+            let receiveKey = %msg.Key |> Convert.FromBase64String 
             
             Expect.isTrue "" msg.IsKeyBase64Encoded
             Expect.equal "" "one" receivedValue

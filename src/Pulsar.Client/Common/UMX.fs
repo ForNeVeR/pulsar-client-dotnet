@@ -11,6 +11,7 @@ open FSharp.UMX
 [<Measure>] type private sequenceId
 [<Measure>] type private clientCnxId
 [<Measure>] type private completeTopicName
+[<Measure>] type private partitionKey
 [<Measure>] type private batchIndex
 
 type LedgerId = int64<ledgerId>
@@ -21,4 +22,5 @@ type ConsumerId = uint64<consumerId>
 type SequenceId = uint64<sequenceId>
 type ClientCnxId = uint64<clientCnxId>
 type CompleteTopicName = string<completeTopicName>
+type PartitionKey = string<partitionKey>
 type BatchIndex = int<batchIndex>

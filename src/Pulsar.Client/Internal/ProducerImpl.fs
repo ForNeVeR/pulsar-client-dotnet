@@ -37,12 +37,9 @@ type internal ProducerImpl<'T> private (producerConfig: ProducerConfiguration, c
     let producerCreatedTsc = TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously)
     let mutable maxMessageSize = Commands.DEFAULT_MAX_MESSAGE_SIZE
     let mutable schemaVersion = None
-
     let pendingMessages = Queue<PendingMessage<'T>>()
-
     let compressionCodec = CompressionCodec.create producerConfig.CompressionType
-
-    let keyValueProcessor: IKeyValueProcessor voption = KeyValueProcessor.GetInstance schema
+    let keyValueProcessor = KeyValueProcessor.GetInstance schema
     
     let protoCompressionType =
         match producerConfig.CompressionType with
@@ -146,15 +143,9 @@ type internal ProducerImpl<'T> private (producerConfig: ProducerConfiguration, c
             )
         if protoCompressionType <> pulsar.proto.CompressionType.None then
             metadata.Compression <- protoCompressionType
-        match message.Key with
-        | Plain key when (String.IsNullOrEmpty(key) |> not) ->
-            metadata.PartitionKey <- key
-            metadata.PartitionKeyB64Encoded <- false
-        | Base64Encoded key when (String.IsNullOrEmpty(key) |> not) ->
-            metadata.PartitionKey <- key
-            metadata.PartitionKeyB64Encoded <- true
-        | _ ->
-            ()
+        if message.Key.IsSome then
+            metadata.PartitionKey <- %message.Key.Value.PartitionKey
+            metadata.PartitionKeyB64Encoded <- message.Key.Value.IsBase64Encoded
         if message.Properties.Count > 0 then
             for property in message.Properties do
                 metadata.Properties.Add(KeyValue(Key = property.Key, Value = property.Value))
@@ -169,7 +160,7 @@ type internal ProducerImpl<'T> private (producerConfig: ProducerConfiguration, c
 
     let sendOneBatch (batchPayload: byte[], batchCallbacks: BatchCallback<'T>[]) =
         let batchSize = batchCallbacks.Length
-        let msgBuilder = MessageBuilder(batchPayload, batchPayload, Plain null)
+        let msgBuilder = MessageBuilder(batchPayload, batchPayload, None)
         let metadata = createMessageMetadata msgBuilder (Some batchSize)
         let sequenceId = %metadata.SequenceId
         let encodedBatchPayload = compressionCodec.Encode msgBuilder.Payload
@@ -539,12 +530,14 @@ type internal ProducerImpl<'T> private (producerConfig: ProducerConfiguration, c
         member this.NewMessage (value:'T,
             [<Optional; DefaultParameterValue(null:string)>]key:string,
             [<Optional; DefaultParameterValue(null:IReadOnlyDictionary<string,string>)>]properties: IReadOnlyDictionary<string, string>,
-            [<Optional; DefaultParameterValue(Nullable():Nullable<int64>)>]deliverAt:Nullable<int64>) =
-            
+            [<Optional; DefaultParameterValue(Nullable():Nullable<int64>)>]deliverAt:Nullable<int64>) =            
             keyValueProcessor
             |> ValueOption.map(fun kvp -> kvp.GetKeyValue value)
-            |> ValueOption.map(fun struct(k, v) -> MessageBuilder(value, v, Base64Encoded k, properties, deliverAt))
-            |> ValueOption.defaultValue (MessageBuilder(value, schema.Encode(value), Plain key, properties, deliverAt))
+            |> ValueOption.map(fun struct(k, v) -> MessageBuilder(value, v, Some { PartitionKey = %k; IsBase64Encoded = true }, properties, deliverAt))
+            |> ValueOption.defaultValue (
+                MessageBuilder(value, schema.Encode(value),
+                                (if String.IsNullOrEmpty(key) then None else Some { PartitionKey = %key; IsBase64Encoded = false }),
+                                properties, deliverAt))
                 
         member this.ProducerId = producerId
 

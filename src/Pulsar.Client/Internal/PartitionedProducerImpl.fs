@@ -203,7 +203,8 @@ type internal PartitionedProducerImpl<'T> private (producerConfig: ProducerConfi
         | Uninitialized | Failed ->
             raise (NotConnectedException(prefix + " Invalid connection state: " + this.ConnectionState.ToString()))
         | Ready ->
-            let partition = router.ChoosePartition(message.Key, numPartitions)
+            let keyString = message.Key |> Option.map(fun k -> k.PartitionKey) |> Option.defaultValue %""
+            let partition = router.ChoosePartition(keyString, numPartitions)
             if partition < 0 || partition >= numPartitions
             then
                 failwith (prefix + " Illegal partition index chosen by the message routing policy: " + partition.ToString())
@@ -263,8 +264,11 @@ type internal PartitionedProducerImpl<'T> private (producerConfig: ProducerConfi
             
             keyValueProcessor
             |> ValueOption.map(fun kvp -> kvp.GetKeyValue value)
-            |> ValueOption.map(fun struct(k, v) -> MessageBuilder(value, v, Base64Encoded k, properties, deliverAt))
-            |> ValueOption.defaultValue (MessageBuilder(value, schema.Encode(value), Plain key, properties, deliverAt))
+            |> ValueOption.map(fun struct(k, v) -> MessageBuilder(value, v, Some { PartitionKey = %k; IsBase64Encoded = true }, properties, deliverAt))
+            |> ValueOption.defaultValue (
+                MessageBuilder(value, schema.Encode(value),
+                                (if String.IsNullOrEmpty(key) then None else Some { PartitionKey = %key; IsBase64Encoded = false }),
+                                properties, deliverAt))
 
         member this.ProducerId = producerId
 

@@ -21,12 +21,9 @@ module internal BatchHelpers =
                 let message = batchItem.Message
                 let smm = SingleMessageMetadata(PayloadSize = message.Payload.Length)
                 match message.Key with
-                | Plain key when (String.IsNullOrEmpty(key) |> not) ->
-                    smm.PartitionKey <- key
-                    smm.PartitionKeyB64Encoded <- false
-                | Base64Encoded key when (String.IsNullOrEmpty(key) |> not) ->
-                    smm.PartitionKey <- key
-                    smm.PartitionKeyB64Encoded <- true
+                | Some key ->
+                    smm.PartitionKey <- %key.PartitionKey
+                    smm.PartitionKeyB64Encoded <- key.IsBase64Encoded
                 | _ ->
                     ()
                 if message.Properties.Count > 0 then
@@ -98,19 +95,23 @@ type internal KeyBasedBatchMessageContainer<'T>(prefix: string, config: Producer
     inherit MessageContainer<'T>(config)
 
     let prefix = prefix + " KeyBasedBatcher"
-    let keyBatchItems = Dictionary<MessageKey, ResizeArray<BatchItem<'T>>>()
+    let keyBatchItems = Dictionary<PartitionKey, ResizeArray<BatchItem<'T>>>()
 
     override this.Add batchItem =
         Log.Logger.LogDebug("{0} add message to batch, num messages in batch so far is {1}", prefix, this.NumMessagesInBatch)
         this.CurrentBatchSizeBytes <- this.CurrentBatchSizeBytes + batchItem.Message.Payload.Length
         this.NumMessagesInBatch <- this.NumMessagesInBatch + 1
-        match keyBatchItems.TryGetValue batchItem.Message.Key with
+        let key =
+            match batchItem.Message.Key with
+            | Some key -> key.PartitionKey
+            | None -> %""
+        match keyBatchItems.TryGetValue key with
         | true, items ->
             items.Add(batchItem)
         | false, _ ->
             let arr = ResizeArray<BatchItem<'T>>()
             arr.Add(batchItem)
-            keyBatchItems.Add(batchItem.Message.Key, arr)
+            keyBatchItems.Add(key, arr)
         this.IsBatchFull()
     override this.CreateOpSendMsg () =
         raise <| NotSupportedException()
