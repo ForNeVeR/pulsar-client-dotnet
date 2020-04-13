@@ -20,6 +20,13 @@ type internal ProducerOperations =
         TopicTerminatedError: unit -> unit
         RecoverChecksumError: SequenceId -> unit
         ConnectionClosed: ClientCnx -> unit
+    }    
+and internal ConsumerOperations =
+    {
+        MessageReceived: RawMessage -> unit
+        ReachedEndOfTheTopic: unit -> unit
+        ActiveConsumerChanged: bool -> unit
+        ConnectionClosed: ClientCnx -> unit
     }
     
 and internal RequestsOperation =
@@ -30,7 +37,7 @@ and internal RequestsOperation =
     
 and internal CnxOperation =
     | AddProducer of ProducerId * ProducerOperations
-    | AddConsumer of ConsumerId * MailboxProcessor<ConsumerMessage>
+    | AddConsumer of ConsumerId * ConsumerOperations
     | RemoveConsumer of ConsumerId
     | RemoveProducer of ProducerId
     | ChannelInactive
@@ -71,7 +78,7 @@ and internal ClientCnx (config: PulsarClientConfiguration,
                 initialConnectionTsc: TaskCompletionSource<ClientCnx>,
                 unregisterClientCnx: Broker -> unit) as this =
 
-    let consumers = Dictionary<ConsumerId, MailboxProcessor<ConsumerMessage>>()
+    let consumers = Dictionary<ConsumerId, ConsumerOperations>()
     let producers = Dictionary<ProducerId, ProducerOperations>()
     let requests = Dictionary<RequestId, TaskCompletionSource<PulsarResponseType>>()
     let clientCnxId = Generators.getNextClientCnxId()
@@ -125,13 +132,13 @@ and internal ClientCnx (config: PulsarClientConfiguration,
         let rec loop () =
             async {
                 match! inbox.Receive() with
-                | AddProducer (producerId, mb) ->
+                | AddProducer (producerId, producerOperation) ->
                     Log.Logger.LogDebug("{0} adding producer {1}", prefix, producerId)
-                    producers.Add(producerId, mb)
+                    producers.Add(producerId, producerOperation)
                     return! loop()
-                | AddConsumer (consumerId, mb) ->
+                | AddConsumer (consumerId, consumerOperation) ->
                     Log.Logger.LogDebug("{0} adding consumer {1}", prefix, consumerId)
-                    consumers.Add(consumerId, mb)
+                    consumers.Add(consumerId, consumerOperation)
                     return! loop()
                 | RemoveConsumer consumerId ->
                     Log.Logger.LogDebug("{0} removing consumer {1}", prefix, consumerId)
@@ -151,8 +158,8 @@ and internal ClientCnx (config: PulsarClientConfiguration,
                         isActive <- false
                         unregisterClientCnx(broker)
                         requestsMb.Post(FailAllRequestsAndStop)
-                        consumers |> Seq.iter(fun kv ->
-                            kv.Value.Post(ConsumerMessage.ConnectionClosed this))
+                        consumers |> Seq.iter(fun (KeyValue(_,consumerOperation)) ->
+                            consumerOperation.ConnectionClosed(this))
                         producers |> Seq.iter(fun (KeyValue(_,producerOperation)) ->
                             producerOperation.ConnectionClosed(this))
                     return! loop()
@@ -314,10 +321,9 @@ and internal ClientCnx (config: PulsarClientConfiguration,
             HasNumMessagesInBatch = messageMetadata.ShouldSerializeNumMessagesInBatch()
             CompressionType = messageMetadata.Compression |> mapCompressionType
             UncompressedMessageSize = messageMetadata.UncompressedSize |> int32
-        }
-  
+        } 
             
-        MessageReceived {
+        {
             MessageId = { LedgerId = %(int64 cmd.MessageId.ledgerId); EntryId = %(int64 cmd.MessageId.entryId); Type = Individual; Partition = -1; TopicName = %"" }
             RedeliveryCount = cmd.RedeliveryCount
             Metadata = medadata
@@ -367,9 +373,9 @@ and internal ClientCnx (config: PulsarClientConfiguration,
         | XCommandPing _ ->
             Commands.newPong() |> SocketMessageWithoutReply |> sendMb.Post
         | XCommandMessage (cmd, metadata, payload) ->
-            let consumerMb = consumers.[%cmd.ConsumerId]
+            let consumerOperations = consumers.[%cmd.ConsumerId]
             let msgReceived = getMessageReceived cmd metadata payload
-            consumerMb.Post(msgReceived)
+            consumerOperations.MessageReceived(msgReceived)
         | XCommandLookupTopicResponse cmd ->
             if (cmd.ShouldSerializeError()) then
                 checkServerError cmd.Error cmd.Message
@@ -394,11 +400,11 @@ and internal ClientCnx (config: PulsarClientConfiguration,
             let producerOperations = producers.[%cmd.ProducerId]
             producerOperations.ConnectionClosed(this)
         | XCommandCloseConsumer cmd ->
-            let consumerMb = consumers.[%cmd.ConsumerId]
-            consumerMb.Post (ConsumerMessage.ConnectionClosed this)
+            let consumerOperations = consumers.[%cmd.ConsumerId]
+            consumerOperations.ConnectionClosed(this)
         | XCommandReachedEndOfTopic cmd ->
-            let consumerMb = consumers.[%cmd.ConsumerId]
-            consumerMb.Post ReachedEndOfTheTopic
+            let consumerOperations = consumers.[%cmd.ConsumerId]
+            consumerOperations.ReachedEndOfTheTopic()
         | XCommandGetTopicsOfNamespaceResponse cmd ->
             let result = TopicsOfNamespace { Topics = List.ofSeq cmd.Topics }
             handleSuccess %cmd.RequestId result
@@ -411,8 +417,8 @@ and internal ClientCnx (config: PulsarClientConfiguration,
                 TopicName = %"" }
             handleSuccess %cmd.RequestId result
         | XCommandActiveConsumerChange cmd ->
-            let consumerMb = consumers.[%cmd.ConsumerId]
-            consumerMb.Post (ActiveConsumerChanged cmd.IsActive)
+            let consumerOperations = consumers.[%cmd.ConsumerId]
+            consumerOperations.ActiveConsumerChanged(cmd.IsActive)
         | XCommandError cmd ->
             Log.Logger.LogError("{0} CommandError Error: {1}. Message: {2}", prefix, cmd.Error, cmd.Message)
             handleError %cmd.RequestId cmd.Error cmd.Message
@@ -483,8 +489,8 @@ and internal ClientCnx (config: PulsarClientConfiguration,
     member this.AddProducer (producerId: ProducerId, producerOperations: ProducerOperations) =
         operationsMb.Post(AddProducer (producerId, producerOperations))
 
-    member this.AddConsumer (consumerId: ConsumerId, consumerMb: MailboxProcessor<ConsumerMessage>) =
-        operationsMb.Post(AddConsumer (consumerId, consumerMb))
+    member this.AddConsumer (consumerId: ConsumerId, consumerOperations: ConsumerOperations) =
+        operationsMb.Post(AddConsumer (consumerId, consumerOperations))
 
     member this.Close() =
         connection.Dispose()

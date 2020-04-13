@@ -14,11 +14,11 @@ open FSharp.Control
 [<Tests>]
 let tests =
 
-    let readerLoopRead (reader: Reader) =
+    let readerLoopRead (reader: IReader<byte[]>) =
         task {
             let! hasSomeMessages = reader.HasMessageAvailableAsync()
             let mutable continueLooping = hasSomeMessages
-            let resizeArray = ResizeArray<Message>()
+            let resizeArray = ResizeArray<Message<byte[]>>()
             while continueLooping do
                 let! msg = reader.ReadNextAsync()
                 let received = Encoding.UTF8.GetString(msg.Data)
@@ -90,7 +90,7 @@ let tests =
                     .CreateAsync()
             let! result = readerLoopRead reader
             Expect.equal "" numberOfMessages result.Count
-            do! reader.CloseAsync()
+            do! reader.DisposeAsync()
 
             let! reader2 =
                 client.NewReader()
@@ -111,8 +111,8 @@ let tests =
             let! result3 = readerLoopRead reader3
             Expect.equal "" numberOfMessages result3.Count
 
-            do! reader2.CloseAsync()
-            do! reader3.CloseAsync()
+            do! reader2.DisposeAsync()
+            do! reader3.DisposeAsync()
 
             Log.Debug("Finished Muliple readers non-batching configuration works fine batching: " + batching.ToString())
         }
@@ -148,7 +148,7 @@ let tests =
 
             let! result = readerLoopRead reader
             Expect.equal "" 1 result.Count
-            do! reader.CloseAsync()
+            do! reader.DisposeAsync()
 
             Log.Debug("Finished Check reading from producer messageId. Batching: " + batching.ToString())
         }

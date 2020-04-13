@@ -119,7 +119,7 @@ let tests =
                         do! producePredefinedMessages producer2 messages2
                     }:> Task)
 
-            let getStream (consumer: IConsumer) =
+            let getStream (consumer: IConsumer<'T>) =
                 asyncSeq {
                     while not consumer.HasReachedEndOfTopic do
                         let! message = (consumer.ReceiveAsync() |> Async.AwaitTask)

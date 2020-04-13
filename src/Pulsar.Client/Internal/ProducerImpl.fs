@@ -23,7 +23,7 @@ type internal ProducerMessage<'T> =
     | SendMessage of PendingMessage<'T>
     | RecoverChecksumError of SequenceId
     | TopicTerminatedError
-    | Close of AsyncReplyChannel<Task>
+    | Close of AsyncReplyChannel<ResultOrException<unit>>
     | StoreBatchItem of MessageBuilder<'T> * AsyncReplyChannel<TaskCompletionSource<MessageId>>
     | SendBatchTick
     | SendTimeoutTick
@@ -438,25 +438,24 @@ type internal ProducerImpl<'T> private (producerConfig: ProducerConfiguration, c
                         Log.Logger.LogInformation("{0} starting close", prefix)
                         let requestId = Generators.getNextRequestId()
                         let payload = Commands.newCloseProducer producerId requestId
-                        task {
-                            try
-                                let! response = clientCnx.SendAndWaitForReply requestId payload |> Async.AwaitTask
-                                response |> PulsarResponseType.GetEmpty
-                                clientCnx.RemoveProducer(producerId)
-                                connectionHandler.Closed()
-                                stopProducer()
-                                failPendingMessages(AlreadyClosedException("Producer was already closed"))
-                            with
-                            | ex ->
-                                Log.Logger.LogError(ex, "{0} failed to close", prefix)
-                                reraize ex
-                        } |> channel.Reply
+                        try
+                            let! response = clientCnx.SendAndWaitForReply requestId payload |> Async.AwaitTask
+                            response |> PulsarResponseType.GetEmpty
+                            clientCnx.RemoveProducer(producerId)
+                            connectionHandler.Closed()
+                            stopProducer()
+                            failPendingMessages(AlreadyClosedException("Producer was already closed"))
+                            channel.Reply <| Result()
+                        with
+                        | ex ->
+                            Log.Logger.LogError(ex, "{0} failed to close", prefix)
+                            channel.Reply <| Exn ex
                     | _ ->
                         Log.Logger.LogInformation("{0} can't close since connection already closed", prefix)
                         connectionHandler.Closed()
                         stopProducer()
                         failPendingMessages(AlreadyClosedException("Producer was already closed"))
-                        channel.Reply(Task.FromResult())
+                        channel.Reply <| Result()
 
             }
         loop ()
@@ -495,7 +494,7 @@ type internal ProducerImpl<'T> private (producerConfig: ProducerConfiguration, c
             let producer = ProducerImpl(producerConfig, clientConfig, connectionPool, partitionIndex, lookup, schema,
                                         interceptors, cleanup)
             do! producer.InitInternal()
-            return producer :> IProducer<'T>
+            return producer
         }
 
     interface IProducer<'T> with
@@ -552,6 +551,8 @@ type internal ProducerImpl<'T> private (producerConfig: ProducerConfiguration, c
             | _ ->
                 task {
                     let! result = mb.PostAndAsyncReply(ProducerMessage.Close)
-                    return! result
+                    match result with
+                    | Result () -> ()
+                    | Exn ex -> reraize ex 
                 } |> ValueTask
             

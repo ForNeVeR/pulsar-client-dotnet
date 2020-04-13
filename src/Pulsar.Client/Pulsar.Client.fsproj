@@ -57,6 +57,7 @@
     <Compile Include="Api\Authentication.fs" />
     <Compile Include="Api\IMessageRouter.fs" />
     <Compile Include="Api\IConsumer.fs" />
+    <Compile Include="Api\IReader.fs" />
     <Compile Include="Api\IProducer.fs" />
     <Compile Include="Api\DeadLetters.fs" />
     <Compile Include="Api\IConsumerInterceptor.fs" />
@@ -91,11 +92,11 @@
     <Compile Include="Internal\Compression .fs" />
     <Compile Include="Internal\ProducerImpl.fs" />
     <Compile Include="Internal\ConsumerImpl.fs" />
+    <Compile Include="Internal\ReaderImpl.fs" />
     <Compile Include="Internal\MultiTopicsConsumerImpl.fs" />
     <Compile Include="Internal\PartitionedProducerImpl.fs" />
     <Compile Include="Api\Schema.fs" />
     <Compile Include="Api\AuthenticationFactory.fs" />
-    <Compile Include="Api\Reader.fs" />
     <Compile Include="Api\ProducerBuilder.fs" />
     <Compile Include="Api\ConsumerBuilder.fs" />
     <Compile Include="Api\ReaderBuilder.fs" />

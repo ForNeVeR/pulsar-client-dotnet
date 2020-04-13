@@ -35,7 +35,7 @@ let tests =
                     .CreateAsync() |> Async.AwaitTask
 
             let! consumer =
-                client.NewConsumer()
+                client.NewConsumer(Schema.STRING())
                     .Topic(topicName)
                     .SubscriptionName("test-subscription")
                     .SubscribeAsync() |> Async.AwaitTask
@@ -44,9 +44,8 @@ let tests =
             let! _ = producer.SendAsync(sentText) |> Async.AwaitTask
 
             let! msg = consumer.ReceiveAsync() |> Async.AwaitTask
-            let receivedText = msg.Data |> Encoding.UTF8.GetString
 
-            Expect.equal "" sentText receivedText
+            Expect.equal "" sentText msg.Value
 
             Log.Debug("Finished String schema works fine")
         }
@@ -64,7 +63,7 @@ let tests =
                     .CreateAsync() |> Async.AwaitTask
 
             let! consumer =
-                client.NewConsumer()
+                client.NewConsumer(Schema.JSON<SimpleRecord>())
                     .Topic(topicName)
                     .SubscriptionName("test-subscription")
                     .SubscribeAsync() |> Async.AwaitTask
@@ -73,9 +72,8 @@ let tests =
             let! _ = producer.SendAsync(input) |> Async.AwaitTask
 
             let! msg = consumer.ReceiveAsync() |> Async.AwaitTask
-            let output = JsonSerializer.Deserialize<SimpleRecord>(ReadOnlySpan msg.Data)
 
-            Expect.equal "" input output
+            Expect.equal "" input msg.Value
 
             Log.Debug("Finished Json schema works fine")
         }

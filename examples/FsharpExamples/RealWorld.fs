@@ -12,7 +12,7 @@ open System.Threading.Tasks
 
 
 
-let internal processMessages<'a> (consumer: IConsumer, logger: ILogger, f: Message -> Task<unit>, cancellationToken: CancellationToken) =
+let internal processMessages<'a> (consumer: IConsumer<byte[]>, logger: ILogger, f: Message<byte[]> -> Task<unit>, cancellationToken: CancellationToken) =
     task {
         try
             while not cancellationToken.IsCancellationRequested do
@@ -83,7 +83,7 @@ let runRealWorld (logger: ILogger) =
         
         cts.Dispose()
         do! Task.Delay(200);// wait for pending acknowledgments to complete
-        do! consumer.CloseAsync()
+        do! consumer.DisposeAsync()
         do! producer.DisposeAsync()
         do! client.CloseAsync()
     }

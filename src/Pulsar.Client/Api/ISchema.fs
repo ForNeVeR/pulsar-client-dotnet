@@ -31,3 +31,4 @@ type ISchema<'T> =
     abstract member Type: SchemaType
     abstract member SchemaData: byte[]
     abstract member Encode: 'T -> byte[]
+    abstract member Decode: byte[] -> 'T

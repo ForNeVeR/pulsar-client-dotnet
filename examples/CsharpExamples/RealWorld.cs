@@ -24,7 +24,7 @@ namespace CsharpExamples
             }
         }
         
-        internal static async Task ProcessMessages(IConsumer consumer, ILogger logger, Func<Message, Task> f,
+        internal static async Task ProcessMessages(IConsumer<byte[]> consumer, ILogger logger, Func<Message<byte[]>, Task> f,
             CancellationToken ct)
         {
             try
@@ -93,7 +93,7 @@ namespace CsharpExamples
             
             cts.Dispose();
             await Task.Delay(200);// wait for pending acknowledgments to complete
-            await consumer.CloseAsync();
+            await consumer.DisposeAsync();
             await producer.DisposeAsync();
             await client.CloseAsync();
         }

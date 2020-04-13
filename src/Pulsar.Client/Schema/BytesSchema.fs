@@ -9,4 +9,5 @@ type BytesSchema() =
         member this.Type = SchemaType.BYTES
         member this.SchemaData= [||]
         member this.Encode value = value
+        member this.Decode bytes = bytes
 

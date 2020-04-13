@@ -2,6 +2,7 @@ namespace Pulsar.Client.Schema
 
 open System
 open System.Collections.Generic
+open System.Collections.Generic
 open System.IO
 open Pulsar.Client.Api
 open Pulsar.Client.Common
@@ -17,6 +18,15 @@ type KeyValueSchema<'K,'V>(keySchema: ISchema<'K>, valueSchema: ISchema<'V>, kvT
         binaryWriter.Write(int32ToBigEndian valueBytes.Length)
         binaryWriter.Write(valueBytes)
         result
+        
+    let separateKeyAndValueBytes (keyValueBytes: byte[]) =
+        use stream = new MemoryStream(keyValueBytes)
+        use binaryWriter = new BinaryReader(stream)
+        let keyLength = binaryWriter.ReadInt32() |> int32FromBigEndian
+        let keyBytes = binaryWriter.ReadBytes(keyLength)
+        let valueLength = binaryWriter.ReadInt32() |> int32FromBigEndian
+        let valueBytes = binaryWriter.ReadBytes(valueLength)
+        (keyBytes, valueBytes)
         
     member this.KeyValueEncodingType = kvType
     
@@ -41,6 +51,18 @@ type KeyValueSchema<'K,'V>(keySchema: ISchema<'K>, valueSchema: ISchema<'V>, kvT
                 valueSchema.Encode(value)
             | _ ->
                 failwith "Unsupported KeyValueEncodingType"
+        member this.Decode bytes =
+            match kvType with
+            | KeyValueEncodingType.INLINE ->
+                let (keyBytes, valueBytes) = separateKeyAndValueBytes(bytes)
+                let key = keySchema.Decode(keyBytes)
+                let value = valueSchema.Decode(valueBytes)
+                KeyValuePair(key, value)
+            | KeyValueEncodingType.SEPARATED ->
+                raise <| SchemaSerializationException "This method cannot be used under this SEPARATED encoding type"
+            | _ ->
+                failwith "Unsupported KeyValueEncodingType"
+        
 
 type internal IKeyValueProcessor =
     abstract member GetKeyValue: obj -> struct(string * byte[])

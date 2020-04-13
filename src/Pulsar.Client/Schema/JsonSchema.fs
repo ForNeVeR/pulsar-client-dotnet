@@ -1,5 +1,6 @@
 namespace Pulsar.Client.Schema
 
+open System
 open System.Text
 open System.Text.Json
 open Pulsar.Client.Api
@@ -15,5 +16,7 @@ type JsonSchema<'T>() =
         member this.SchemaData =      
             stringSchema |> Encoding.UTF8.GetBytes
         member this.Encode value =
-            JsonSerializer.SerializeToUtf8Bytes(value, options)
+            JsonSerializer.SerializeToUtf8Bytes(value, options)            
+        member this.Decode bytes =
+            JsonSerializer.Deserialize<'T>(ReadOnlySpan bytes, options)
 

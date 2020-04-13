@@ -6,7 +6,6 @@ open System.Diagnostics
 
 open Expecto
 open Expecto.Flip
-open Pulsar.Client.Api
 open FSharp.Control.Tasks.V2.ContextInsensitive
 open System.Text
 open System.Threading.Tasks
@@ -186,7 +185,7 @@ let tests =
                             do! consumer.AcknowledgeAsync(message.MessageId)
                             Log.Debug("{0}-{1} acknowledged {2}", consumerName, i, received)
                             if Interlocked.Increment(&processedCount) = (numberOfMessages*3) then
-                                do! consumer.CloseAsync()
+                                do! consumer.DisposeAsync()
                     } :> Task
             let consumerTasks =
                 [| 1..3 |]
@@ -289,7 +288,7 @@ let tests =
                     task {
                         do! consumeMessages consumer1 (numberOfMessages/2) consumerName1
                         do! Task.Delay(100)
-                        do! consumer1.CloseAsync()
+                        do! consumer1.DisposeAsync()
                     }:> Task)
             let consumer2Task =
                 Task.Run(fun () ->
@@ -335,7 +334,7 @@ let tests =
                     .ProducerName("ClosingProducer2")
                     .CreateAsync() |> Async.AwaitTask
 
-            do! consumer1.CloseAsync() |> Async.AwaitTask
+            do! consumer1.DisposeAsync().AsTask() |> Async.AwaitTask
             Expect.throwsT2<AlreadyClosedException> (fun () -> consumer1.ReceiveAsync().Result |> ignore) |> ignore
             do! producer1.DisposeAsync().AsTask() |> Async.AwaitTask
             Expect.throwsT2<AlreadyClosedException> (fun () -> producer1.SendAndForgetAsync([||]).Result |> ignore) |> ignore

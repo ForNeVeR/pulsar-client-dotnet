@@ -9,13 +9,13 @@ open Microsoft.Extensions.Logging
 open FSharp.Control.Tasks.V2.ContextInsensitive
 open FSharp.UMX
 
-type internal DeadLettersProcessor
+type internal DeadLettersProcessor<'T>
     (policy: DeadLettersPolicy,
      getTopicName: unit -> string,
      getSubscriptionNameName: unit -> string,
-     createProducer: string -> Task<IProducer<byte[]>>) =
+     createProducer: string -> Task<IProducer<'T>>) =
 
-    let store = Dictionary<MessageId, Message>()
+    let store = Dictionary<MessageId, Message<'T>>()
 
     let topicName =
         if String.IsNullOrEmpty(policy.DeadLetterTopic) |> not then
@@ -23,11 +23,11 @@ type internal DeadLettersProcessor
         else
             (sprintf "%s-%s-DLQ" (getTopicName()) (getSubscriptionNameName()))
 
-    let producer: Lazy<Task<IProducer<byte[]>>> = lazy (
+    let producer: Lazy<Task<IProducer<'T>>> = lazy (
         createProducer topicName
     )
 
-    interface IDeadLettersProcessor with
+    interface IDeadLettersProcessor<'T> with
         member this.ClearMessages() =
             store.Clear()
 
@@ -49,7 +49,7 @@ type internal DeadLettersProcessor
                                 Some { PartitionKey = message.Key; IsBase64Encoded =  message.IsKeyBase64Encoded  }
                             else
                                 None
-                        let msg = MessageBuilder(message.Data, message.Data, key, message.Properties)
+                        let msg = MessageBuilder(message.Value, message.Data, key, message.Properties)
                         let! _ = producer.SendAsync(msg)
                         do! acknowledge messageId
                         return true
@@ -64,7 +64,7 @@ type internal DeadLettersProcessor
         member this.MaxRedeliveryCount = policy.MaxRedeliveryCount |> uint32
 
     static member Disabled = {
-        new IDeadLettersProcessor with
+        new IDeadLettersProcessor<'T> with
             member this.ClearMessages() = ()
             member this.AddMessage _ _ = ()
             member this.RemoveMessage _ = ()

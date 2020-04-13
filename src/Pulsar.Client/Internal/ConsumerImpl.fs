@@ -13,16 +13,38 @@ open ProtoBuf
 open pulsar.proto
 open System.Threading
 
-type internal ConsumerImpl (consumerConfig: ConsumerConfiguration, clientConfig: PulsarClientConfiguration, connectionPool: ConnectionPool,
+    
+type internal ConsumerMessage<'T> =
+    | ConnectionOpened
+    | ConnectionFailed of exn
+    | ConnectionClosed of obj // ClientCnx
+    | ReachedEndOfTheTopic
+    | MessageReceived of RawMessage
+    | Receive of AsyncReplyChannel<ResultOrException<Message<'T>>>
+    | BatchReceive of AsyncReplyChannel<ResultOrException<Messages<'T>>>
+    | SendBatchByTimeout
+    | Acknowledge of MessageId * AckType
+    | NegativeAcknowledge of MessageId
+    | RedeliverUnacknowledged of RedeliverSet * AsyncReplyChannel<unit>
+    | RedeliverAllUnacknowledged of AsyncReplyChannel<unit>
+    | SeekAsync of SeekData * AsyncReplyChannel<ResultOrException<unit>>
+    | SendFlowPermits of int
+    | HasMessageAvailable of AsyncReplyChannel<Task<bool>>
+    | ActiveConsumerChanged of bool
+    | Close of AsyncReplyChannel<ResultOrException<unit>>
+    | Unsubscribe of AsyncReplyChannel<ResultOrException<unit>>
+
+type internal ConsumerImpl<'T> (consumerConfig: ConsumerConfiguration<'T>, clientConfig: PulsarClientConfiguration, connectionPool: ConnectionPool,
                            partitionIndex: int, startMessageId: MessageId option, lookup: BinaryLookupService,
-                           startMessageRollbackDuration: TimeSpan, createTopicIfDoesNotExist: bool, interceptors: ConsumerInterceptors, cleanup: ConsumerImpl -> unit) as this =
+                           startMessageRollbackDuration: TimeSpan, createTopicIfDoesNotExist: bool, schema: ISchema<'T>,
+                           interceptors: ConsumerInterceptors<'T>, cleanup: ConsumerImpl<'T> -> unit) as this =
 
     [<Literal>]
     let MAX_REDELIVER_UNACKNOWLEDGED = 1000
     let consumerId = Generators.getNextConsumerId()
-    let incomingMessages = Queue<Message>()
-    let waiters = Queue<AsyncReplyChannel<ResultOrException<Message>>>()
-    let batchWaiters = Queue<CancellationTokenSource*AsyncReplyChannel<ResultOrException<Messages>>>()
+    let incomingMessages = Queue<Message<'T>>()
+    let waiters = Queue<AsyncReplyChannel<ResultOrException<Message<'T>>>>()
+    let batchWaiters = Queue<CancellationTokenSource*AsyncReplyChannel<ResultOrException<Messages<'T>>>>()
     let subscribeTsc = TaskCompletionSource<unit>(TaskCreationOptions.RunContinuationsAsynchronously)
     let prefix = sprintf "consumer(%u, %s, %i)" %consumerId consumerConfig.ConsumerName partitionIndex
     let subscribeTimeout = DateTime.Now.Add(clientConfig.OperationTimeout)
@@ -38,7 +60,7 @@ type internal ConsumerImpl (consumerConfig: ConsumerConfiguration, clientConfig:
     let deadLettersProcessor = consumerConfig.DeadLettersProcessor
     let isDurable = consumerConfig.SubscriptionMode = SubscriptionMode.Durable
 
-    let wrapPostAndReply (mbAsyncReply: Async<ResultOrException<'T>>) =
+    let wrapPostAndReply (mbAsyncReply: Async<ResultOrException<'A>>) =
         async {
             match! mbAsyncReply with
             | Result msg ->
@@ -322,6 +344,7 @@ type internal ConsumerImpl (consumerConfig: ConsumerConfiguration, clientConfig:
                         Key = %singleMessageMetadata.PartitionKey
                         IsKeyBase64Encoded = singleMessageMetadata.PartitionKeyB64Encoded
                         Data = singleMessagePayload
+                        Value = schema.Decode(singleMessagePayload)
                     }
                 if (rawMessage.RedeliveryCount >= deadLettersProcessor.MaxRedeliveryCount) then
                     deadLettersProcessor.AddMessage messageId message
@@ -341,13 +364,13 @@ type internal ConsumerImpl (consumerConfig: ConsumerConfiguration, clientConfig:
 
     /// Record the event that one message has been processed by the application.
     /// Periodically, it sends a Flow command to notify the broker that it can push more messages
-    let messageProcessed (msg: Message) =
+    let messageProcessed (msg: Message<'T>) =
         lastDequeuedMessage <- msg.MessageId
         increaseAvailablePermits 1
         if consumerConfig.AckTimeout <> TimeSpan.Zero then
             unAckedMessageTracker.Add msg.MessageId |> ignore
 
-    let replyWithBatch (cts: CancellationTokenSource option) (ch: AsyncReplyChannel<ResultOrException<Messages>>) =
+    let replyWithBatch (cts: CancellationTokenSource option) (ch: AsyncReplyChannel<ResultOrException<Messages<'T>>>) =
         cts |> Option.iter (fun cts ->
             cts.Cancel()
             cts.Dispose()
@@ -385,7 +408,7 @@ type internal ConsumerImpl (consumerConfig: ConsumerConfiguration, clientConfig:
         else
             0
 
-    let replyWithMessage (channel: AsyncReplyChannel<ResultOrException<Message>>) message =
+    let replyWithMessage (channel: AsyncReplyChannel<ResultOrException<Message<'T>>>) message =
         messageProcessed message
         let interceptMsg = interceptors.BeforeConsume(this, message)
         channel.Reply (Result interceptMsg)
@@ -395,7 +418,8 @@ type internal ConsumerImpl (consumerConfig: ConsumerConfiguration, clientConfig:
         acksGroupingTracker.Close()
         clearDeadLetters()
         negativeAcksTracker.Close()
-        connectionHandler.Close()
+        connectionHandler.Close()      
+        interceptors.Close()
         cleanup(this)
         while waiters.Count > 0 do
             let waitingChannel = waiters.Dequeue()
@@ -416,7 +440,14 @@ type internal ConsumerImpl (consumerConfig: ConsumerConfiguration, clientConfig:
         Log.Logger.LogInformation("{0} subscribed to topic {1}", prefix, consumerConfig.Topic)
         avalablePermits <- 0
 
-    let mb = MailboxProcessor<ConsumerMessage>.Start(fun inbox ->
+    let consumerOperations = {
+        MessageReceived = fun (rawMessage) -> this.Mb.Post(MessageReceived rawMessage)
+        ReachedEndOfTheTopic = fun () -> this.Mb.Post(ReachedEndOfTheTopic)
+        ActiveConsumerChanged = fun (isActive) -> this.Mb.Post(ActiveConsumerChanged isActive)
+        ConnectionClosed = fun (clientCnx) -> this.Mb.Post(ConnectionClosed clientCnx)
+    }
+    
+    let mb = MailboxProcessor<ConsumerMessage<'T>>.Start(fun inbox ->
 
         let rec loop () =
             async {
@@ -427,7 +458,7 @@ type internal ConsumerImpl (consumerConfig: ConsumerConfiguration, clientConfig:
                     match connectionHandler.ConnectionState with
                     | Ready clientCnx ->
                         Log.Logger.LogInformation("{0} starting subscribe to topic {1}", prefix, consumerConfig.Topic)
-                        clientCnx.AddConsumer(consumerId, this.Mb)
+                        clientCnx.AddConsumer(consumerId, consumerOperations)
                         let requestId = Generators.getNextRequestId()
                         startMessageId <- clearReceiverQueue()
                         clearDeadLetters()
@@ -526,9 +557,14 @@ type internal ConsumerImpl (consumerConfig: ConsumerConfiguration, clientConfig:
                                 // We need to discard entries that were prior to startMessageId
                                 Log.Logger.LogInformation("{0} Ignoring message from before the startMessageId: {1}", prefix, startMessageId)
                             else
+                                let payload = getDecompressPayload rawMessage
+                                
+                                //TODO decode for KeyValue
+                                
                                 let message = {
+                                    Value = schema.Decode(payload)
                                     MessageId = msgId
-                                    Data = getDecompressPayload rawMessage
+                                    Data = payload
                                     Key = %rawMessage.MessageKey
                                     IsKeyBase64Encoded = rawMessage.IsKeyBase64Encoded
                                     Properties = rawMessage.Properties
@@ -787,7 +823,7 @@ type internal ConsumerImpl (consumerConfig: ConsumerConfiguration, clientConfig:
     )
     do mb.Error.Add(fun ex -> Log.Logger.LogCritical(ex, "{0} mailbox failure", prefix))
 
-    member private this.Mb with get(): MailboxProcessor<ConsumerMessage> = mb
+    member private this.Mb with get(): MailboxProcessor<ConsumerMessage<'T>> = mb
 
     member this.ConsumerId with get() = consumerId
 
@@ -803,7 +839,7 @@ type internal ConsumerImpl (consumerConfig: ConsumerConfiguration, clientConfig:
         and private set(value) = Volatile.Write(&lastMessageIdInBroker, value)
     
     override this.Equals consumer =
-        consumerId = (consumer :?> IConsumer).ConsumerId
+        consumerId = (consumer :?> IConsumer<'T>).ConsumerId
 
     override this.GetHashCode () = int consumerId
     
@@ -814,12 +850,14 @@ type internal ConsumerImpl (consumerConfig: ConsumerConfiguration, clientConfig:
             return! subscribeTsc.Task
         }
 
-    static member Init(consumerConfig: ConsumerConfiguration, clientConfig: PulsarClientConfiguration, connectionPool: ConnectionPool,
+    static member Init(consumerConfig: ConsumerConfiguration<'T>, clientConfig: PulsarClientConfiguration, connectionPool: ConnectionPool,
                        partitionIndex: int, startMessageId: MessageId option, lookup: BinaryLookupService,
-                       createTopicIfDoesNotExist: bool, interceptors: ConsumerInterceptors, cleanup: ConsumerImpl -> unit) =
+                       createTopicIfDoesNotExist: bool, schema: ISchema<'T>,
+                       interceptors: ConsumerInterceptors<'T>, cleanup: ConsumerImpl<'T> -> unit) =
         task {
             let consumer = ConsumerImpl(consumerConfig, clientConfig, connectionPool, partitionIndex,
-                                        startMessageId, lookup, TimeSpan.Zero, createTopicIfDoesNotExist, interceptors, cleanup)
+                                        startMessageId, lookup, TimeSpan.Zero, createTopicIfDoesNotExist,
+                                        schema, interceptors, cleanup)
             do! consumer.InitInternal()
             return consumer
         }
@@ -830,7 +868,7 @@ type internal ConsumerImpl (consumerConfig: ConsumerConfiguration, clientConfig:
             return! mb.PostAndAsyncReply(Receive)
         }
     
-    interface IConsumer with
+    interface IConsumer<'T> with
         
         member this.ReceiveAsync() =
             task {
@@ -854,7 +892,7 @@ type internal ConsumerImpl (consumerConfig: ConsumerConfiguration, clientConfig:
                 mb.Post(Acknowledge(msgId, AckType.Individual))
             }
             
-        member this.AcknowledgeAsync (msgs: Messages) =
+        member this.AcknowledgeAsync (msgs: Messages<'T>) =
             task {
                 let exn = connectionHandler.CheckIfActive()
                 if not (isNull exn) then 
@@ -897,16 +935,6 @@ type internal ConsumerImpl (consumerConfig: ConsumerConfiguration, clientConfig:
         member this.GetLastMessageIdAsync () =
             getLastMessageIdAsync()
 
-        member this.CloseAsync() =
-            task {
-                interceptors.Close()
-                match connectionHandler.ConnectionState with
-                | Closing | Closed ->
-                    return ()
-                | _ ->
-                    return! wrapPostAndReply <| mb.PostAndAsyncReply(ConsumerMessage.Close)
-            }
-
         member this.UnsubscribeAsync() =
             task {
                 connectionHandler.CheckIfActive() |> throwIfNotNull
@@ -921,7 +949,7 @@ type internal ConsumerImpl (consumerConfig: ConsumerConfiguration, clientConfig:
                 mb.Post(NegativeAcknowledge(msgId))
             }
 
-        member this.NegativeAcknowledge (msgs: Messages)  =
+        member this.NegativeAcknowledge (msgs: Messages<'T>)  =
             task {
                 connectionHandler.CheckIfActive() |> throwIfNotNull 
                 for msg in msgs do
@@ -931,6 +959,20 @@ type internal ConsumerImpl (consumerConfig: ConsumerConfiguration, clientConfig:
         member this.ConsumerId = consumerId
 
         member this.Topic with get() = %consumerConfig.Topic.CompleteTopicName
+        
+    interface IAsyncDisposable with
+        
+        member this.DisposeAsync() =     
+            match connectionHandler.ConnectionState with
+            | Closing | Closed ->
+                ValueTask()
+            | _ ->
+                task {
+                    let! result = mb.PostAndAsyncReply(ConsumerMessage.Close)
+                    match result with
+                    | Result () -> ()
+                    | Exn ex -> reraize ex 
+                } |> ValueTask
 
 
 

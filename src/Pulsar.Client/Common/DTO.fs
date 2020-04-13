@@ -185,21 +185,22 @@ type internal RawMessage =
         Properties: IReadOnlyDictionary<string, string>
     }
 
-type Message =
+type Message<'T> =
     {
         MessageId: MessageId
+        Value: 'T
         Data: byte[]
         Key: PartitionKey
         IsKeyBase64Encoded: bool
         Properties: IReadOnlyDictionary<string, string>
     }
 
-type Messages internal(maxNumberOfMessages: int, maxSizeOfMessages: int64) =
+type Messages<'T> internal(maxNumberOfMessages: int, maxSizeOfMessages: int64) =
 
     let mutable currentNumberOfMessages = 0
     let mutable currentSizeOfMessages = 0L
 
-    let messageList = if maxNumberOfMessages > 0 then ResizeArray<Message>(maxNumberOfMessages) else ResizeArray<Message>()
+    let messageList = if maxNumberOfMessages > 0 then ResizeArray<Message<'T>>(maxNumberOfMessages) else ResizeArray<Message<'T>>()
 
     
     member this.Count with get() =
@@ -211,23 +212,23 @@ type Messages internal(maxNumberOfMessages: int, maxSizeOfMessages: int64) =
         currentNumberOfMessages = maxNumberOfMessages
         || currentSizeOfMessages = maxSizeOfMessages
     
-    member internal this.CanAdd(message: Message) =
+    member internal this.CanAdd(message: Message<'T>) =
         if (maxNumberOfMessages <= 0 && maxSizeOfMessages <= 0L) then
             true
         else
             (maxNumberOfMessages > 0 && currentNumberOfMessages + 1 <= maxNumberOfMessages)
                 || (maxSizeOfMessages > 0L && currentSizeOfMessages + (int64 message.Data.Length) <= maxSizeOfMessages)
 
-    member internal this.Add(message: Message) =
+    member internal this.Add(message: Message<'T>) =
         currentNumberOfMessages <- currentNumberOfMessages + 1
         currentSizeOfMessages <- currentSizeOfMessages + (int64 message.Data.Length)
         messageList.Add(message)
 
-    interface IEnumerable<Message> with
+    interface IEnumerable<Message<'T>> with
         member this.GetEnumerator() =
             messageList.GetEnumerator() :> Collections.IEnumerator
         member this.GetEnumerator() =
-            messageList.GetEnumerator() :> IEnumerator<Message>
+            messageList.GetEnumerator() :> IEnumerator<Message<'T>>
 
 /// <summary>
 ///     Message builder that constructs a message to be published through a producer.
@@ -339,26 +340,6 @@ type AuthData =
         Bytes: byte[]
     }
     static member INIT_AUTH_DATA = Encoding.UTF8.GetBytes("PulsarAuthInit")
-    
-type internal ConsumerMessage =
-    | ConnectionOpened
-    | ConnectionFailed of exn
-    | ConnectionClosed of obj // ClientCnx
-    | ReachedEndOfTheTopic
-    | MessageReceived of RawMessage
-    | Receive of AsyncReplyChannel<ResultOrException<Message>>
-    | BatchReceive of AsyncReplyChannel<ResultOrException<Messages>>
-    | SendBatchByTimeout
-    | Acknowledge of MessageId * AckType
-    | NegativeAcknowledge of MessageId
-    | RedeliverUnacknowledged of RedeliverSet * AsyncReplyChannel<unit>
-    | RedeliverAllUnacknowledged of AsyncReplyChannel<unit>
-    | SeekAsync of SeekData * AsyncReplyChannel<ResultOrException<unit>>
-    | SendFlowPermits of int
-    | HasMessageAvailable of AsyncReplyChannel<Task<bool>>
-    | ActiveConsumerChanged of bool
-    | Close of AsyncReplyChannel<ResultOrException<unit>>
-    | Unsubscribe of AsyncReplyChannel<ResultOrException<unit>>
 
 type MessageRoutingMode =
     | SinglePartition = 0
@@ -401,5 +382,6 @@ exception TopicDoesNotExistException of string
 // custom exception
 exception ConnectionFailedOnSend of string
 exception MaxMessageSizeChanged of int
+exception SchemaSerializationException of string
 
 

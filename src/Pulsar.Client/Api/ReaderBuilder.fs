@@ -4,7 +4,7 @@ open System
 open System.Threading.Tasks
 open Pulsar.Client.Common
 
-type ReaderBuilder private (createReaderAsync, config: ReaderConfiguration) =
+type ReaderBuilder<'T> private (createReaderAsync, config: ReaderConfiguration, schema: ISchema<'T>) =
 
     let verify(config : ReaderConfiguration) =
         let checkValue check config =
@@ -27,10 +27,10 @@ type ReaderBuilder private (createReaderAsync, config: ReaderConfiguration) =
                 else
                     c)
 
-    internal new(createReaderAsync) = ReaderBuilder(createReaderAsync, ReaderConfiguration.Default)
+    internal new(createReaderAsync, schema) = ReaderBuilder(createReaderAsync, ReaderConfiguration.Default, schema)
     
     member private this.With(newConfig) =
-        ReaderBuilder(createReaderAsync, newConfig)
+        ReaderBuilder(createReaderAsync, newConfig, schema)
 
     member this.Topic topic =        
         { config with
@@ -76,8 +76,6 @@ type ReaderBuilder private (createReaderAsync, config: ReaderConfiguration) =
             StartMessageFromRollbackDuration = rollbackDuration }
         |> this.With
 
-    member this.CreateAsync(): Task<Reader> =
-        config
-        |> verify
-        |> createReaderAsync
+    member this.CreateAsync(): Task<IReader<'T>> =
+        createReaderAsync(verify config, schema)
 

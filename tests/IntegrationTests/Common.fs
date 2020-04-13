@@ -111,7 +111,7 @@ let getMessageNumber (msg: string) =
     let subString = msg.Substring(ind1+1, ind2 - ind1 - 2)
     int subString
 
-let consumeMessages (consumer: IConsumer) number consumerName =
+let consumeMessages (consumer: IConsumer<byte[]>) number consumerName =
     task {
         for i in [1..number] do
             let! message = consumer.ReceiveAsync()
@@ -124,7 +124,7 @@ let consumeMessages (consumer: IConsumer) number consumerName =
                 failwith <| sprintf "Incorrect message expected %s received %s consumer %s" expected received consumerName
     }
 
-let consumeMessagesWithProps (consumer: IConsumer) number consumerName =
+let consumeMessagesWithProps (consumer: IConsumer<byte[]>) number consumerName =
     task {
         for i in [1..number] do
             let! message = consumer.ReceiveAsync()
@@ -143,7 +143,7 @@ let consumeMessagesWithProps (consumer: IConsumer) number consumerName =
                 failwith <| sprintf "Incorrect properties %s" consumerName
     }
 
-let consumeAndVerifyMessages (consumer: IConsumer) consumerName (expectedMessages : string[]) =
+let consumeAndVerifyMessages (consumer: IConsumer<byte[]>) consumerName (expectedMessages : string[]) =
     task {
         for _ in [1..expectedMessages.Length] do
             let! message = consumer.ReceiveAsync()

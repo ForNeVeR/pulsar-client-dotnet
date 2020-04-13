@@ -27,7 +27,7 @@ let tests =
             NumberOfMessages = 10
         |}
 
-    let receiveAndAckNegative (consumer: IConsumer) number =
+    let receiveAndAckNegative (consumer: IConsumer<'T>) number =
         task {
             for _ in 1..number do
                 let! message = consumer.ReceiveAsync()

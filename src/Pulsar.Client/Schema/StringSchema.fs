@@ -8,5 +8,7 @@ type StringSchema internal (charset: System.Text.Encoding) =
         member this.Type = SchemaType.STRING
         member this.SchemaData= [||]
         member this.Encode value =
-            charset.GetBytes(value)
+            charset.GetBytes(value)            
+        member this.Decode bytes =
+            charset.GetString(bytes)
 

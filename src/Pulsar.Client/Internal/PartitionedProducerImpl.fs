@@ -13,6 +13,7 @@ open Pulsar.Client.Schema
 open System.Threading
 open System.Timers
 
+//TODO : remove task
 type internal PartitionedProducerMessage =
     | Init
     | Close of AsyncReplyChannel<Task<unit>>
@@ -81,8 +82,11 @@ type internal PartitionedProducerImpl<'T> private (producerConfig: ProducerConfi
                             let partititonedConfig = { producerConfig with
                                                         MaxPendingMessages = maxPendingMessages
                                                         Topic = partitionedTopic }
-                            ProducerImpl.Init(partititonedConfig, clientConfig, connectionPool, partitionIndex, lookup,
-                                              schema, interceptors, fun _ -> ()))
+                            task {
+                                let! producer = ProducerImpl.Init(partititonedConfig, clientConfig, connectionPool, partitionIndex, lookup,
+                                                    schema, interceptors, fun _ -> ())
+                                return producer :> IProducer<'T>
+                            })
                     // we mark success if all the partitions are created
                     // successfully, else we throw an exception
                     // due to any
@@ -150,8 +154,11 @@ type internal PartitionedProducerImpl<'T> private (producerConfig: ProducerConfi
                                     let partititonedConfig = { producerConfig with
                                                                 MaxPendingMessages = maxPendingMessages
                                                                 Topic = partitionedTopic }
-                                    ProducerImpl.Init(partititonedConfig, clientConfig, connectionPool, partitionIndex, lookup,
-                                                      schema, interceptors, fun _ -> ()))
+                                    task {
+                                        let! producer = ProducerImpl.Init(partititonedConfig, clientConfig, connectionPool, partitionIndex, lookup,
+                                                            schema, interceptors, fun _ -> ())
+                                        return producer :> IProducer<'T>
+                                    })
                             try
                                 let! producerResults =
                                     producerTasks
@@ -228,7 +235,7 @@ type internal PartitionedProducerImpl<'T> private (producerConfig: ProducerConfi
             let producer = PartitionedProducerImpl(producerConfig, clientConfig, connectionPool, partitions, lookup,
                                                    schema, interceptors, cleanup)
             do! producer.InitInternal()
-            return producer :> IProducer<'T>
+            return producer
         }
 
     interface IProducer<'T> with
