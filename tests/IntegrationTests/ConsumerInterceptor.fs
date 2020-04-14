@@ -329,6 +329,8 @@ let tests =
             let inMessagesIdSet = messageIds |> Set.ofSeq
             let ackMessagesIdSet = consumerInterceptor.AckTimeoutMessageIds |> Seq.map id |> Set.ofSeq
 
-            if not (inMessagesIdSet - ackMessagesIdSet).IsEmpty then failwith "MessageIds in AckTimeoutMessageIds not equal to send messageIds"
+            if not (inMessagesIdSet - ackMessagesIdSet).IsEmpty then
+                let diff = inMessagesIdSet - ackMessagesIdSet |> Set.map(fun m -> string m.EntryId) |> String.concat ";"
+                failwith (sprintf "MessageIds in AckTimeoutMessageIds not equal to send messageIds: %s" diff)
         }
     ]
