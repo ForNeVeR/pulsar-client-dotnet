@@ -3,6 +3,7 @@ namespace Pulsar.Client.Schema
 open System
 open System.Collections.Generic
 open System.Collections.Generic
+open System.Collections.Generic
 open System.IO
 open Pulsar.Client.Api
 open Pulsar.Client.Common
@@ -28,11 +29,13 @@ type KeyValueSchema<'K,'V>(keySchema: ISchema<'K>, valueSchema: ISchema<'V>, kvT
         let valueBytes = binaryWriter.ReadBytes(valueLength)
         (keyBytes, valueBytes)
         
-    member this.KeyValueEncodingType = kvType
-    
-    member this.KeySchema = keySchema
-    
-    member this.ValueSchema = valueSchema
+    member this.KeyValueEncodingType = kvType    
+    member this.KeySchema = keySchema    
+    member this.ValueSchema = valueSchema    
+    member this.Decode (keyBytes, valueBytes) =
+        let k = keySchema.Decode(keyBytes)
+        let v = valueSchema.Decode(valueBytes)
+        KeyValuePair(k, v)    
     
     interface ISchema<KeyValuePair<'K,'V>> with
         member this.Name = "KeyValue"
@@ -65,18 +68,21 @@ type KeyValueSchema<'K,'V>(keySchema: ISchema<'K>, valueSchema: ISchema<'V>, kvT
         
 
 type internal IKeyValueProcessor =
-    abstract member GetKeyValue: obj -> struct(string * byte[])
+    abstract member EncodeKeyValue: obj -> struct(string * byte[])
+    abstract member DecodeKeyValue: string * byte[] -> obj
     abstract member EncodingType: KeyValueEncodingType
 
 type internal KeyValueProcessor<'K,'V>(schema: KeyValueSchema<'K,'V>) =
     
     interface IKeyValueProcessor with
-        member this.GetKeyValue value =
+        member this.EncodeKeyValue value =
             let (KeyValue(k, v)) = value :?> KeyValuePair<'K,'V>
             let strKey = schema.KeySchema.Encode(k) |> Convert.ToBase64String
             let content = schema.ValueSchema.Encode(v)
-            struct(strKey, content)
-                
+            struct(strKey, content)            
+        member this.DecodeKeyValue(strKey: string, content) =
+            let keyBytes = strKey |> Convert.FromBase64String
+            schema.Decode(keyBytes, content) |> box                
         member this.EncodingType =
             schema.KeyValueEncodingType
                 

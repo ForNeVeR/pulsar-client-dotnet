@@ -10,7 +10,7 @@ type BooleanSchema() =
         member this.SchemaData= [||]
         member this.Encode value = [| if value then 1uy else 0uy |]
         member this.Decode bytes =
-            if (bytes.Length <> -1) then
+            if (bytes.Length <> 1) then
                 raise <| SchemaSerializationException "Size of data received by BooleanSchema is not 1"
             bytes.[0] <> 0uy
 

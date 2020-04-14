@@ -78,9 +78,9 @@ let tests =
             Log.Debug("Finished Json schema works fine")
         }
         
-        testAsync "KeyValue schema works fine" {
+        testAsync "KeyValue schema separated works fine" {
 
-            Log.Debug("Start KeyValue schema works fine")
+            Log.Debug("Start KeyValue schema separated works fine")
             let client = getClient()
             let topicName = "public/default/topic-" + Guid.NewGuid().ToString("N")
 
@@ -91,7 +91,7 @@ let tests =
                     .CreateAsync() |> Async.AwaitTask
 
             let! consumer =
-                client.NewConsumer()
+                client.NewConsumer(Schema.KEY_VALUE(Schema.BOOL(), Schema.STRING(), KeyValueEncodingType.SEPARATED))
                     .Topic(topicName)
                     .SubscriptionName("test-subscription")
                     .SubscribeAsync() |> Async.AwaitTask
@@ -99,14 +99,41 @@ let tests =
             let! _ = producer.SendAsync(KeyValuePair(true, "one")) |> Async.AwaitTask
 
             let! msg = consumer.ReceiveAsync() |> Async.AwaitTask
-            let receivedValue = msg.Data |> Encoding.UTF8.GetString
-            let receiveKey = %msg.Key |> Convert.FromBase64String 
             
             Expect.isTrue "" msg.IsKeyBase64Encoded
-            Expect.equal "" "one" receivedValue
-            Expect.sequenceEqual "" receiveKey [| 1uy |]
+            Expect.equal "" "one" msg.Value.Value
+            Expect.equal "" true msg.Value.Key
 
-            Log.Debug("Finished KeyValue schema works fine")
+            Log.Debug("Finished KeyValue schema separated works fine")
+        }
+        
+        testAsync "KeyValue schema inline works fine" {
+
+            Log.Debug("Start KeyValue schema inline works fine")
+            let client = getClient()
+            let topicName = "public/default/topic-" + Guid.NewGuid().ToString("N")
+
+            let! producer =
+                client.NewProducer(Schema.KEY_VALUE(Schema.BOOL(), Schema.STRING(), KeyValueEncodingType.INLINE))
+                    .Topic(topicName)
+                    .EnableBatching(false)
+                    .CreateAsync() |> Async.AwaitTask
+
+            let! consumer =
+                client.NewConsumer(Schema.KEY_VALUE(Schema.BOOL(), Schema.STRING(), KeyValueEncodingType.INLINE))
+                    .Topic(topicName)
+                    .SubscriptionName("test-subscription")
+                    .SubscribeAsync() |> Async.AwaitTask
+
+            let! _ = producer.SendAsync(KeyValuePair(true, "one")) |> Async.AwaitTask
+
+            let! msg = consumer.ReceiveAsync() |> Async.AwaitTask
+            
+            Expect.isFalse "" msg.IsKeyBase64Encoded
+            Expect.equal "" "one" msg.Value.Value
+            Expect.equal "" true msg.Value.Key
+
+            Log.Debug("Finished KeyValue schema inline works fine")
         }
     ]
     

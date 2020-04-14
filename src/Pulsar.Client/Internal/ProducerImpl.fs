@@ -531,9 +531,9 @@ type internal ProducerImpl<'T> private (producerConfig: ProducerConfiguration, c
             [<Optional; DefaultParameterValue(null:IReadOnlyDictionary<string,string>)>]properties: IReadOnlyDictionary<string, string>,
             [<Optional; DefaultParameterValue(Nullable():Nullable<int64>)>]deliverAt:Nullable<int64>) =            
             keyValueProcessor
-            |> ValueOption.map(fun kvp -> kvp.GetKeyValue value)
+            |> ValueOption.map(fun kvp -> kvp.EncodeKeyValue value)
             |> ValueOption.map(fun struct(k, v) -> MessageBuilder(value, v, Some { PartitionKey = %k; IsBase64Encoded = true }, properties, deliverAt))
-            |> ValueOption.defaultValue (
+            |> ValueOption.defaultWith (fun () ->
                 MessageBuilder(value, schema.Encode(value),
                                 (if String.IsNullOrEmpty(key) then None else Some { PartitionKey = %key; IsBase64Encoded = false }),
                                 properties, deliverAt))

@@ -270,7 +270,7 @@ type internal PartitionedProducerImpl<'T> private (producerConfig: ProducerConfi
             [<Optional; DefaultParameterValue(Nullable():Nullable<int64>)>]deliverAt:Nullable<int64>) =
             
             keyValueProcessor
-            |> ValueOption.map(fun kvp -> kvp.GetKeyValue value)
+            |> ValueOption.map(fun kvp -> kvp.EncodeKeyValue value)
             |> ValueOption.map(fun struct(k, v) -> MessageBuilder(value, v, Some { PartitionKey = %k; IsBase64Encoded = true }, properties, deliverAt))
             |> ValueOption.defaultValue (
                 MessageBuilder(value, schema.Encode(value),

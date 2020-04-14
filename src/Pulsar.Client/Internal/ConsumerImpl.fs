@@ -10,6 +10,7 @@ open Pulsar.Client.Common
 open Microsoft.Extensions.Logging
 open System.IO
 open ProtoBuf
+open Pulsar.Client.Schema
 open pulsar.proto
 open System.Threading
 
@@ -58,7 +59,8 @@ type internal ConsumerImpl<'T> (consumerConfig: ConsumerConfiguration<'T>, clien
     let mutable incomingMessagesSize = 0L
     let receiverQueueRefillThreshold = consumerConfig.ReceiverQueueSize / 2
     let deadLettersProcessor = consumerConfig.DeadLettersProcessor
-    let isDurable = consumerConfig.SubscriptionMode = SubscriptionMode.Durable
+    let isDurable = consumerConfig.SubscriptionMode = SubscriptionMode.Durable    
+    let keyValueProcessor = KeyValueProcessor.GetInstance schema
 
     let wrapPostAndReply (mbAsyncReply: Async<ResultOrException<'A>>) =
         async {
@@ -559,10 +561,13 @@ type internal ConsumerImpl<'T> (consumerConfig: ConsumerConfiguration<'T>, clien
                             else
                                 let payload = getDecompressPayload rawMessage
                                 
-                                //TODO decode for KeyValue
+                                let value =
+                                    keyValueProcessor
+                                    |> ValueOption.map(fun kvp -> kvp.DecodeKeyValue(rawMessage.MessageKey, payload) :?> 'T)
+                                    |> ValueOption.defaultWith(fun () -> schema.Decode(payload))
                                 
                                 let message = {
-                                    Value = schema.Decode(payload)
+                                    Value = value
                                     MessageId = msgId
                                     Data = payload
                                     Key = %rawMessage.MessageKey
