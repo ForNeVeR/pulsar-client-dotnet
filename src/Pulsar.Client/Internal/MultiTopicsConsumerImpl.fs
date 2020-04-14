@@ -24,8 +24,6 @@ type internal BatchAddResponse<'T> =
     | BatchReady of Messages<'T>
     | Success
 
-
-//TODO : remove tasks
 type internal MultiTopicConsumerMessage<'T> =
     | Init
     | Receive of AsyncReplyChannel<Async<ResultOrException<Message<'T>> option>>
@@ -37,8 +35,8 @@ type internal MultiTopicConsumerMessage<'T> =
     | NegativeAcknowledge of AsyncReplyChannel<Task<unit>> * MessageId
     | AcknowledgeCumulative of AsyncReplyChannel<Task<unit>> * MessageId
     | RedeliverUnacknowledgedMessages of AsyncReplyChannel<Task>
-    | Close of AsyncReplyChannel<Task<unit>>
-    | Unsubscribe of AsyncReplyChannel<Task<unit>>
+    | Close of AsyncReplyChannel<ResultOrException<unit>>
+    | Unsubscribe of AsyncReplyChannel<ResultOrException<unit>>
     | HasReachedEndOfTheTopic of AsyncReplyChannel<bool>
     | Seek of AsyncReplyChannel<Task> * uint64
     | TickTime
@@ -274,40 +272,43 @@ type internal MultiTopicsConsumerImpl<'T> private (consumerConfig: ConsumerConfi
                     Log.Logger.LogDebug("{0} Close", prefix)
                     match this.ConnectionState with
                     | Closing | Closed ->
-                        channel.Reply(Task.FromResult())
+                        channel.Reply <| Result()
                     | _ ->
                         this.ConnectionState <- Closing
                         let consumerTasks = consumers |> Seq.map(fun kv -> kv.Value.DisposeAsync().AsTask())
-                        task {
-                            try
-                                let! _ = Task.WhenAll consumerTasks
-                                this.ConnectionState <- Closed
-                                Log.Logger.LogInformation("{0} closed", prefix)
-                            with ex ->
-                                Log.Logger.LogError(ex, "{0} could not close", prefix)
-                                this.ConnectionState <- Failed
-                        } |> channel.Reply
-                        stopConsumer()
+                        try
+                            let! _ = Task.WhenAll consumerTasks |> Async.AwaitTask
+                            this.ConnectionState <- Closed
+                            Log.Logger.LogInformation("{0} closed", prefix)
+                            stopConsumer()
+                            channel.Reply <| Result()
+                        with ex ->
+                            Log.Logger.LogError(ex, "{0} could not close", prefix)
+                            this.ConnectionState <- Failed
+                            channel.Reply <| Exn ex
+                            return! loop state
+                        
 
                 | Unsubscribe channel ->
 
                     Log.Logger.LogDebug("{0} Unsubscribe", prefix)
                     match this.ConnectionState with
                     | Closing | Closed ->
-                        channel.Reply(Task.FromResult())
+                        channel.Reply <| Result()
                     | _ ->
                         this.ConnectionState <- Closing
                         let consumerTasks = consumers |> Seq.map(fun kv -> kv.Value.UnsubscribeAsync())
-                        task {
-                            try
-                                let! _ = Task.WhenAll consumerTasks
-                                this.ConnectionState <- Closed
-                                Log.Logger.LogInformation("{0} unsubscribed", prefix)
-                            with ex ->
-                                Log.Logger.LogError(ex, "{0} could not unsubscribe", prefix)
-                                this.ConnectionState <- Failed        
-                        } |> channel.Reply
-                        stopConsumer()
+                        try
+                            let! _ = Task.WhenAll consumerTasks |> Async.AwaitTask
+                            this.ConnectionState <- Closed
+                            Log.Logger.LogInformation("{0} unsubscribed", prefix)    
+                            stopConsumer()
+                            channel.Reply <| Result()
+                        with ex ->
+                            Log.Logger.LogError(ex, "{0} could not unsubscribe", prefix)
+                            this.ConnectionState <- Failed    
+                            channel.Reply <| Exn ex
+                            return! loop state
 
                 | HasReachedEndOfTheTopic channel ->
 
@@ -519,7 +520,9 @@ type internal MultiTopicsConsumerImpl<'T> private (consumerConfig: ConsumerConfi
         member this.UnsubscribeAsync() =
             task {
                 let! result = mb.PostAndAsyncReply(Unsubscribe)
-                return! result
+                match result with
+                | Result () -> ()
+                | Exn ex -> reraize ex
             }
 
         member this.HasReachedEndOfTopic with get() =
@@ -551,5 +554,7 @@ type internal MultiTopicsConsumerImpl<'T> private (consumerConfig: ConsumerConfi
                     return ()
                 | _ ->
                     let! result = mb.PostAndAsyncReply(Close)
-                    return! result
+                    match result with
+                    | Result () -> ()
+                    | Exn ex -> reraize ex
             } |> ValueTask

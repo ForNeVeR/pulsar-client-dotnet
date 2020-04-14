@@ -13,10 +13,9 @@ open Pulsar.Client.Schema
 open System.Threading
 open System.Timers
 
-//TODO : remove task
 type internal PartitionedProducerMessage =
     | Init
-    | Close of AsyncReplyChannel<Task<unit>>
+    | Close of AsyncReplyChannel<ResultOrException<unit>>
     | TickTime
 
 type internal PartitionedConnectionState =
@@ -118,21 +117,20 @@ type internal PartitionedProducerImpl<'T> private (producerConfig: ProducerConfi
 
                     match this.ConnectionState with
                     | Closing | Closed ->
-                        channel.Reply(Task.FromResult())
+                        channel.Reply <| Result()
                     | _ ->
                         this.ConnectionState <- Closing
-                        let producersTasks = producers |> Seq.map(fun producer -> task { return! producer.DisposeAsync() })
-                        task {
-                            try
-                                let! _ = Task.WhenAll producersTasks
-                                this.ConnectionState <- Closed
-                                Log.Logger.LogInformation("{0} closed", prefix)
-                            with ex ->
-                                Log.Logger.LogError(ex, "{0} could not close", prefix)
-                                this.ConnectionState <- Failed
-                                return! loop ()
-                        } |> channel.Reply
-                        stopProducer()
+                        let producersTasks = producers |> Seq.map(fun producer -> task { return! producer.DisposeAsync() })                       
+                        try
+                            let! _ = Task.WhenAll producersTasks |> Async.AwaitTask
+                            this.ConnectionState <- Closed
+                            Log.Logger.LogInformation("{0} closed", prefix)
+                            stopProducer()
+                        with ex ->
+                            Log.Logger.LogError(ex, "{0} could not close", prefix)
+                            this.ConnectionState <- Failed
+                            channel.Reply <| Exn ex
+                            return! loop ()
 
                 | TickTime  ->
 
@@ -272,7 +270,7 @@ type internal PartitionedProducerImpl<'T> private (producerConfig: ProducerConfi
             keyValueProcessor
             |> ValueOption.map(fun kvp -> kvp.EncodeKeyValue value)
             |> ValueOption.map(fun struct(k, v) -> MessageBuilder(value, v, Some { PartitionKey = %k; IsBase64Encoded = true }, properties, deliverAt))
-            |> ValueOption.defaultValue (
+            |> ValueOption.defaultWith (fun () ->
                 MessageBuilder(value, schema.Encode(value),
                                 (if String.IsNullOrEmpty(key) then None else Some { PartitionKey = %key; IsBase64Encoded = false }),
                                 properties, deliverAt))
@@ -290,5 +288,7 @@ type internal PartitionedProducerImpl<'T> private (producerConfig: ProducerConfi
                     return ()
                 | _ ->
                     let! result = mb.PostAndAsyncReply(Close)
-                    return! result
+                    match result with
+                    | Result () -> ()
+                    | Exn ex -> reraize ex
             } |> ValueTask

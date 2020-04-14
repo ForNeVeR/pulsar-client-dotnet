@@ -332,7 +332,11 @@ type internal ConsumerImpl<'T> (consumerConfig: ConsumerConfiguration<'T>, clien
                             Partition = partitionIndex
                             Type = Cumulative(%i, acker)
                             TopicName = %""
-                    }
+                    }                
+                let value =
+                    keyValueProcessor
+                    |> ValueOption.map(fun kvp -> kvp.DecodeKeyValue(rawMessage.MessageKey, singleMessagePayload) :?> 'T)
+                    |> ValueOption.defaultWith(fun () -> schema.Decode(singleMessagePayload))                    
                 let message =
                     {
                         MessageId = messageId
@@ -346,7 +350,7 @@ type internal ConsumerImpl<'T> (consumerConfig: ConsumerConfiguration<'T>, clien
                         Key = %singleMessageMetadata.PartitionKey
                         IsKeyBase64Encoded = singleMessageMetadata.PartitionKeyB64Encoded
                         Data = singleMessagePayload
-                        Value = schema.Decode(singleMessagePayload)
+                        Value = value
                     }
                 if (rawMessage.RedeliveryCount >= deadLettersProcessor.MaxRedeliveryCount) then
                     deadLettersProcessor.AddMessage messageId message

@@ -451,7 +451,7 @@ type internal ProducerImpl<'T> private (producerConfig: ProducerConfiguration, c
                             Log.Logger.LogError(ex, "{0} failed to close", prefix)
                             channel.Reply <| Exn ex
                     | _ ->
-                        Log.Logger.LogInformation("{0} can't close since connection already closed", prefix)
+                        Log.Logger.LogInformation("{0} closing but current state {1}", prefix, connectionHandler.ConnectionState)
                         connectionHandler.Closed()
                         stopProducer()
                         failPendingMessages(AlreadyClosedException("Producer was already closed"))
