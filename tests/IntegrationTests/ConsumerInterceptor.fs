@@ -305,7 +305,7 @@ let tests =
                     .ConsumerName("concurrent")
                     .SubscriptionName("test-subscription")
                     .Intercept(consumerInterceptor)
-                    .AckTimeout(TimeSpan.FromMilliseconds(1001.0))
+                    .AckTimeout(TimeSpan.FromMilliseconds(1000.0))
                     .SubscribeAsync() |> Async.AwaitTask
 
             let producerTask =
