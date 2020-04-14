@@ -129,7 +129,8 @@ type internal ProducerImpl private (producerConfig: ProducerConfiguration, clien
         let sequenceId =
             if message.SequenceId.HasValue then
                 message.SequenceId.Value
-            else System.Threading.Interlocked.Exchange(&messageIdGenerator, messageIdGenerator + 1L) |> uint64
+            else
+                System.Threading.Interlocked.Exchange(&messageIdGenerator, messageIdGenerator + 1L) |> uint64
 
         let metadata =
             MessageMetadata (
@@ -534,6 +535,6 @@ type internal ProducerImpl private (producerConfig: ProducerConfiguration, clien
 
         member this.Topic = %producerConfig.Topic.CompleteTopicName
 
-        member this.LastSequenceId = lastSequenceId
+        member this.LastSequenceId = lastSequenceIdPublished
 
         member this.Name = producerConfig.ProducerName
