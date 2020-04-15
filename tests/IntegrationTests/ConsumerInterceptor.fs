@@ -286,7 +286,7 @@ let tests =
 
             if not (inMessagesIdSet - ackMessagesIdSet).IsEmpty then failwith "MessageIds in NegativeAcknowledge not equal to send messageIds"
         }
-        testAsync "Check OnAckTimeoutSend" {
+        ftestAsync "Check OnAckTimeoutSend" {
 
             let client = getClient()
             let topicName = "public/default/topic-" + Guid.NewGuid().ToString("N")

@@ -37,20 +37,16 @@ jobs:
         sudo apt-get install -y libsnappy-dev
         sudo apt-get install -y libzstd-dev
     
-    - name: Run Unit Tests
-      run: |
-        cd tests/UnitTests
-        dotnet run -c Release --no-build
-
     - name: docker-compose status
       run: |
         cd tests/compose/standalone
+        sleep 30
         docker-compose ps
         docker-compose logs init
         docker-compose logs initTls
 
     - name: Run Integration Tests
-      timeout-minutes: 2
+      timeout-minutes: 11
       run: |
         cd tests/IntegrationTests
-        dotnet run --no-spinner --debug
+        dotnet run --no-spinner --stress 10
