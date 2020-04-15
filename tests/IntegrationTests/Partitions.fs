@@ -15,7 +15,7 @@ open FSharp.Control
 [<Tests>]
 let tests =
 
-    testList "partitions" [
+    ptestList "partitions" [
 
         testAsync "Single producer and single consumer with 3 partitions" {
 

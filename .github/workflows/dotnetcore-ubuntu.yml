@@ -49,4 +49,4 @@ jobs:
       timeout-minutes: 11
       run: |
         cd tests/IntegrationTests
-        dotnet run --no-spinner --stress 10
+        dotnet run --no-spinner --stress 10 --sequenced
