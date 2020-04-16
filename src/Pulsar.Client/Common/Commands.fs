@@ -204,7 +204,8 @@ let newGetTopicsOfNamespaceRequest (ns : NamespaceName) (requestId : RequestId) 
 let newSubscribe (topicName: CompleteTopicName) (subscription: string) (consumerId: ConsumerId) (requestId: RequestId)
     (consumerName: string) (subscriptionType: SubscriptionType) (subscriptionInitialPosition: SubscriptionInitialPosition)
     (readCompacted: bool) (startMessageId: MessageIdData) (durable: bool) (startMessageRollbackDuration: TimeSpan)
-    (createTopicIfDoesNotExist: bool) (keySharedPolicy: KeySharedPolicy option) =
+    (createTopicIfDoesNotExist: bool) (keySharedPolicy: KeySharedPolicy option) (schema: ISchema<'T>) =
+    let schema = getSchema schema
     let subType =
         match subscriptionType with
         | SubscriptionType.Exclusive -> CommandSubscribe.SubType.Exclusive
@@ -219,7 +220,7 @@ let newSubscribe (topicName: CompleteTopicName) (subscription: string) (consumer
         | _ -> failwith "Unknown initialPosition type"
     let request = CommandSubscribe(Topic = %topicName, Subscription = subscription, subType = subType, ConsumerId = %consumerId,
                     RequestId = %requestId, ConsumerName =  consumerName, initialPosition = initialPosition, ReadCompacted = readCompacted,
-                    StartMessageId = startMessageId, Durable = durable, ForceTopicCreation = createTopicIfDoesNotExist)
+                    StartMessageId = startMessageId, Durable = durable, ForceTopicCreation = createTopicIfDoesNotExist, Schema = schema)
     match keySharedPolicy with
     | Some keySharedPolicy ->
         let meta = KeySharedMeta()

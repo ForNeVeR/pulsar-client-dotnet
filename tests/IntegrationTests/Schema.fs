@@ -2,6 +2,8 @@ module Pulsar.Client.IntegrationTests.Schema
 
 open Expecto
 open Expecto.Flip
+open ProtoBuf
+open Pulsar.Client.Common
 open Serilog
 open Pulsar.Client.IntegrationTests.Common
 open System
@@ -15,6 +17,23 @@ open FSharp.UMX
 type SimpleRecord =
     {
         Name: string
+        Age: int
+    }
+    
+[<CLIMutable>]
+type IncompatibleRecord =
+    {
+        Name: int
+        Age: string
+    }
+    
+[<CLIMutable>]
+[<ProtoContract>]
+type SimpleProtoRecord =
+    {
+        [<ProtoMember(1)>]
+        Name: string
+        [<ProtoMember(2)>]
         Age: int
     }
 
@@ -68,7 +87,7 @@ let tests =
                     .SubscriptionName("test-subscription")
                     .SubscribeAsync() |> Async.AwaitTask
 
-            let input = { Name = "abc"; Age = 20  }
+            let input = { SimpleRecord.Name = "abc"; Age = 20  }
             let! _ = producer.SendAsync(input) |> Async.AwaitTask
 
             let! msg = consumer.ReceiveAsync() |> Async.AwaitTask
@@ -134,6 +153,83 @@ let tests =
             Expect.equal "" true msg.Value.Key
 
             Log.Debug("Finished KeyValue schema inline works fine")
+        }
+        
+        testAsync "Protobuf schema works fine" {
+
+            Log.Debug("Start Protobuf schema works fine")
+            let client = getClient()
+            let topicName = "public/default/topic-" + Guid.NewGuid().ToString("N")
+
+            let! producer =
+                client.NewProducer(Schema.PROTOBUF<SimpleProtoRecord>())
+                    .Topic(topicName)
+                    .CreateAsync() |> Async.AwaitTask
+
+            let! consumer =
+                client.NewConsumer(Schema.PROTOBUF<SimpleProtoRecord>())
+                    .Topic(topicName)
+                    .SubscriptionName("test-subscription")
+                    .SubscribeAsync() |> Async.AwaitTask
+
+            let input = { SimpleProtoRecord.Name = "abc"; Age = 20  }
+            let! _ = producer.SendAsync(input) |> Async.AwaitTask
+
+            let! msg = consumer.ReceiveAsync() |> Async.AwaitTask
+
+            Expect.equal "" input msg.Value
+
+            Log.Debug("Finished Protobuf schema works fine")
+        }
+        
+        testAsync "Avro schema works fine" {
+
+            Log.Debug("Start Avro schema works fine")
+            let client = getClient()
+            let topicName = "public/default/topic-" + Guid.NewGuid().ToString("N")
+
+            let! producer =
+                client.NewProducer(Schema.AVRO<SimpleRecord>())
+                    .Topic(topicName)
+                    .EnableBatching(false)
+                    .CreateAsync() |> Async.AwaitTask
+
+            let! consumer =
+                client.NewConsumer(Schema.AVRO<SimpleRecord>())
+                    .Topic(topicName)
+                    .SubscriptionName("test-subscription")
+                    .SubscribeAsync() |> Async.AwaitTask
+
+            let input = { SimpleRecord.Name = "abc"; Age = 20  }
+            let! _ = producer.SendAsync(input) |> Async.AwaitTask
+
+            let! msg = consumer.ReceiveAsync() |> Async.AwaitTask
+
+            Expect.equal "" input msg.Value
+
+            Log.Debug("Finished Avro schema works fine")
+        }
+        
+        testAsync "Incompatible record errors" {
+
+            Log.Debug("Start Incompatible record errors")
+            let client = getClient()
+            let topicName = "public/default/topic-" + Guid.NewGuid().ToString("N")
+
+            let! _ =
+                client.NewProducer(Schema.AVRO<SimpleRecord>())
+                    .Topic(topicName)
+                    .EnableBatching(false)
+                    .CreateAsync() |> Async.AwaitTask
+                    
+            Expect.throwsT2<IncompatibleSchemaException> (fun () ->                    
+                    client.NewConsumer(Schema.AVRO<IncompatibleRecord>())
+                        .Topic(topicName)
+                        .SubscriptionName("test-subscription")
+                        .SubscribeAsync().GetAwaiter().GetResult() |> ignore
+                ) |> ignore
+
+            Log.Debug("Finished Incompatible record errors")
         }
     ]
     

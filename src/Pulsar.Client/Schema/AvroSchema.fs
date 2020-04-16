@@ -1,11 +1,10 @@
 namespace Pulsar.Client.Schema
 
+open System.Text
 open Avro
 open Avro.IO
 open Avro.Reflect
 open System.IO
-open ProtoBuf
-open System.Text
 open Pulsar.Client.Api
 open SharpPulsar.Impl.Schema
 open Pulsar.Client.Common

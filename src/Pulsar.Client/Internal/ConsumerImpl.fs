@@ -103,7 +103,7 @@ type internal ConsumerImpl<'T> (consumerConfig: ConsumerConfiguration<'T>, clien
             else
                 None
         match duringSeek with
-        | Some _ as seekMsgId  ->
+        | Some _ as seekMsgId ->
             duringSeek <- None
             seekMsgId
         | None when isDurable ->
@@ -495,7 +495,7 @@ type internal ConsumerImpl<'T> (consumerConfig: ConsumerConfiguration<'T>, clien
                                 consumerConfig.Topic.CompleteTopicName consumerConfig.SubscriptionName
                                 consumerId requestId consumerConfig.ConsumerName consumerConfig.SubscriptionType
                                 consumerConfig.SubscriptionInitialPosition consumerConfig.ReadCompacted msgIdData isDurable
-                                startMessageRollbackDuration createTopicIfDoesNotExist consumerConfig.KeySharedPolicy
+                                startMessageRollbackDuration createTopicIfDoesNotExist consumerConfig.KeySharedPolicy schema
                         try
                             let! response = clientCnx.SendAndWaitForReply requestId payload |> Async.AwaitTask
                             response |> PulsarResponseType.GetEmpty
