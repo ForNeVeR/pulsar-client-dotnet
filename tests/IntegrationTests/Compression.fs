@@ -2,7 +2,6 @@ module Pulsar.Client.IntegrationTests.Compression
 
 open System
 open Expecto
-open Pulsar.Client.Api
 open FSharp.Control.Tasks.V2.ContextInsensitive
 open System.Threading.Tasks
 open Serilog

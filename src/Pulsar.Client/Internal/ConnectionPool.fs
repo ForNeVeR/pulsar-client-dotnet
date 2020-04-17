@@ -15,7 +15,6 @@ open System.IO.Pipelines
 open Pulsar.Client.Api
 open System.Net.Sockets
 open System.Net.Security
-open System.Security.Authentication
 open System.Security.Cryptography.X509Certificates
 
 type internal ConnectionPool (config: PulsarClientConfiguration) =

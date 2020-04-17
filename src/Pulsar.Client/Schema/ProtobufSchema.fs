@@ -4,7 +4,6 @@ open ProtoBuf
 open System.IO
 open Pulsar.Client.Common
 open System.Text
-open System.Text.Json
 open Pulsar.Client.Api
 open SharpPulsar.Impl.Schema
 

@@ -182,6 +182,7 @@ type internal RawMessage =
         Payload: byte[]
         MessageKey: string
         IsKeyBase64Encoded: bool
+        CheckSumValid: bool
         Properties: IReadOnlyDictionary<string, string>
     }
 

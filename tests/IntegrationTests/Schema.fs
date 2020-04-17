@@ -8,10 +8,7 @@ open Serilog
 open Pulsar.Client.IntegrationTests.Common
 open System
 open System.Collections.Generic
-open System.Text
-open System.Text.Json
 open Pulsar.Client.Api
-open FSharp.UMX
 
 [<CLIMutable>]
 type SimpleRecord =

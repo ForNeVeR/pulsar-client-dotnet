@@ -137,6 +137,14 @@ let newAck (consumerId : ConsumerId) (ledgerId: LedgerId) (entryId: EntryId) (ac
     let command = BaseCommand(``type`` = CommandType.Ack, Ack = request)
     serializeSimpleCommand command
 
+let newErrorAck (consumerId : ConsumerId) (ledgerId: LedgerId) (entryId: EntryId) (ackType : AckType)
+    (error: CommandAck.ValidationError) : Payload =
+    let request = CommandAck(ConsumerId = %consumerId, ack_type = ackType.ToCommandAckType())
+    request.MessageIds.Add(MessageIdData(ledgerId = uint64 %ledgerId, entryId = uint64 %entryId))
+    request.validation_error <- error
+    let command = BaseCommand(``type`` = CommandType.Ack, Ack = request)
+    serializeSimpleCommand command
+
 let newMultiMessageAck (consumerId : ConsumerId) (messages: seq<LedgerId*EntryId>) : Payload =
     let request = CommandAck(ConsumerId = %consumerId, ack_type = CommandAck.AckType.Individual)
     messages

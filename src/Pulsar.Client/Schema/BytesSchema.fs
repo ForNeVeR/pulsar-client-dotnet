@@ -1,7 +1,6 @@
 namespace Pulsar.Client.Schema
 
 open Pulsar.Client.Api
-open pulsar.proto
 
 type BytesSchema() =
     interface ISchema<byte[]> with
