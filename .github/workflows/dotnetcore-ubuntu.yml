@@ -49,4 +49,4 @@ jobs:
       timeout-minutes: 2
       run: |
         cd tests/IntegrationTests
-        dotnet run --no-spinner --sequenced --stress-memory-limit 1000
+        dotnet run --no-spinner
