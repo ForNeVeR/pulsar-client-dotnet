@@ -46,7 +46,7 @@ jobs:
         docker-compose logs initTls
 
     - name: Run Integration Tests
-      timeout-minutes: 11
+      timeout-minutes: 2
       run: |
         cd tests/IntegrationTests
-        dotnet run --no-spinner --stress 10 --sequenced
+        dotnet run --no-spinner --sequenced --stress-memory-limit 1000

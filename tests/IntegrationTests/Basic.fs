@@ -302,7 +302,7 @@ let tests =
             Log.Debug("Finished Failover consumer works fine")
         }
 
-        testAsync "Client, producer and consumer can't be accessed after close" {
+        ptestAsync "Client, producer and consumer can't be accessed after close" {
 
             Log.Debug("Started 'Client, producer and consumer can't be accessed after close'")
 
@@ -409,7 +409,7 @@ let tests =
         }
         
         // Before running this test set 'maxMessageSize' for broker and 'nettyMaxFrameSizeBytes' for bookkeeper 
-        ptestAsync "Send large message works fine" {
+        testAsync "Send large message works fine" {
 
             Log.Debug("Started Send large message works fine")
             let client = getClient()
