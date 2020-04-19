@@ -8,8 +8,7 @@ open System.Threading.Tasks
 open Pulsar.Client.Common
 open Pulsar.Client.IntegrationTests.Common
 
-
-
+#if !NOTLS
 [<Tests>]
 let tests =
     testList "Tls" [
@@ -51,3 +50,4 @@ let tests =
         }
 
     ]
+#endif
