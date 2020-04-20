@@ -46,10 +46,10 @@ type internal DeadLettersProcessor<'T>
                         let! producer = producer.Value
                         let key =
                             if String.IsNullOrEmpty(%message.Key) then
-                                Some { PartitionKey = message.Key; IsBase64Encoded =  message.IsKeyBase64Encoded  }
+                                Some { PartitionKey = message.Key; IsBase64Encoded =  message.HasBase64EncodedKey  }
                             else
                                 None
-                        let msg = MessageBuilder(message.Value, message.Data, key, message.Properties)
+                        let msg = MessageBuilder(message.GetValue(), message.Data, key, message.Properties)
                         let! _ = producer.SendAsync(msg)
                         do! acknowledge messageId
                         return true

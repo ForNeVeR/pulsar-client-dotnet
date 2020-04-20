@@ -5,7 +5,7 @@ open System.IO
 open Pulsar.Client.Common
 open System.Text
 open Pulsar.Client.Api
-open SharpPulsar.Impl.Schema
+open AvroSchemaGenerator
 
 type ProtobufSchema<'T>() =
     let stringSchema = typeof<'T>.GetSchema()      

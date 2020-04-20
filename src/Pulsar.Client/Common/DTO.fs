@@ -188,12 +188,18 @@ type internal RawMessage =
 
 type Message<'T> =
     {
+        /// Get the unique message ID associated with this message.
         MessageId: MessageId
-        Value: 'T
+        /// Get the raw payload of the message.
         Data: byte[]
+        /// Get the key of the message.
         Key: PartitionKey
-        IsKeyBase64Encoded: bool
+        /// Check whether the key has been base64 encoded.
+        HasBase64EncodedKey: bool
+        /// Return the properties attached to the message.
         Properties: IReadOnlyDictionary<string, string>
+        /// Get the de-serialized value of the message, according the configured Schema.
+        GetValue: unit -> 'T
     }
 
 type Messages<'T> internal(maxNumberOfMessages: int, maxSizeOfMessages: int64) =
@@ -384,5 +390,8 @@ exception TopicDoesNotExistException of string
 exception ConnectionFailedOnSend of string
 exception MaxMessageSizeChanged of int
 exception SchemaSerializationException of string
+
+exception DecompressionException of string
+exception BatchDeserializationException of string
 
 

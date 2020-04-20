@@ -314,6 +314,7 @@ type internal ConsumerImpl<'T> (consumerConfig: ConsumerConfiguration<'T>, clien
         incomingMessagesSize <- incomingMessagesSize - msg.Data.LongLength
         msg
     
+    
     let receiveIndividualMessagesFromBatch (rawMessage: RawMessage) (decompressedPayload: byte[]) =
         let batchSize = rawMessage.Metadata.NumMessages
         let acker = BatchMessageAcker(batchSize)
@@ -335,10 +336,11 @@ type internal ConsumerImpl<'T> (consumerConfig: ConsumerConfiguration<'T>, clien
                             Partition = partitionIndex
                             Type = Cumulative(%i, acker)
                             TopicName = %""
-                    }                
-                let value =
+                    }
+                let msgKey = singleMessageMetadata.PartitionKey
+                let getValue () =
                     keyValueProcessor
-                    |> ValueOption.map(fun kvp -> kvp.DecodeKeyValue(rawMessage.MessageKey, singleMessagePayload) :?> 'T)
+                    |> ValueOption.map(fun kvp -> kvp.DecodeKeyValue(msgKey, singleMessagePayload) :?> 'T)
                     |> ValueOption.defaultWith(fun () -> schema.Decode(singleMessagePayload))                    
                 let message =
                     {
@@ -350,10 +352,10 @@ type internal ConsumerImpl<'T> (consumerConfig: ConsumerConfiguration<'T>, clien
                                 |> readOnlyDict
                             else
                                 EmptyProps
-                        Key = %singleMessageMetadata.PartitionKey
-                        IsKeyBase64Encoded = singleMessageMetadata.PartitionKeyB64Encoded
+                        Key = %msgKey
+                        HasBase64EncodedKey = singleMessageMetadata.PartitionKeyB64Encoded
                         Data = singleMessagePayload
-                        Value = value
+                        GetValue = getValue
                     }
                 if (rawMessage.RedeliveryCount >= deadLettersProcessor.MaxRedeliveryCount) then
                     deadLettersProcessor.AddMessage messageId message
@@ -441,29 +443,79 @@ type internal ConsumerImpl<'T> (consumerConfig: ConsumerConfiguration<'T>, clien
         Log.Logger.LogInformation("{0} stopped", prefix)
 
     let getDecompressPayload originalMessage =
-        let compressionCodec = originalMessage.Metadata.CompressionType |> CompressionCodec.create
-        let uncompressedPayload = compressionCodec.Decode originalMessage.Metadata.UncompressedMessageSize originalMessage.Payload
-        uncompressedPayload
+        try
+            let compressionCodec = originalMessage.Metadata.CompressionType |> CompressionCodec.create
+            let uncompressedPayload = compressionCodec.Decode originalMessage.Metadata.UncompressedMessageSize originalMessage.Payload
+            uncompressedPayload
+        with ex ->
+            Log.Logger.LogInformation(ex, "{0} Decompression exception {1}", prefix, originalMessage.MessageId)
+            raise <| DecompressionException "Decompression exception"
 
-    let parseMessage (rawMessage: RawMessage) =
-        if rawMessage.CheckSumValid then
-            try
-                let payload = getDecompressPayload rawMessage
-                // TODO move schema decode?
-                let value =
-                    keyValueProcessor
-                    |> ValueOption.map(fun kvp -> kvp.DecodeKeyValue(rawMessage.MessageKey, payload) :?> 'T)
-                    |> ValueOption.defaultWith(fun () -> schema.Decode(payload))
-                ParseOk struct(payload, value)        
-            with ex ->
-                Log.Logger.LogError("{0} Parsing message error, {1}", prefix, rawMessage.MessageId)
-                ParseError CommandAck.ValidationError.DecompressionError
-        else
-            ParseError CommandAck.ValidationError.ChecksumMismatch
     
     let discardCorruptedMessage (msgId: MessageId) (clientCnx: ClientCnx) error =
         let command = Commands.newErrorAck consumerId msgId.LedgerId msgId.EntryId AckType.Individual error
         clientCnx.Send command
+        
+    let tryDiscard msgId clientCnx err =
+        async {
+            let! discardResult = discardCorruptedMessage msgId clientCnx err
+            if discardResult then
+                Log.Logger.LogInformation("{0} Message {1} was discarded", prefix, msgId)
+            else
+                Log.Logger.LogWarning("{0} Unable to discard {1}", prefix, msgId)
+        }
+        
+    let handleMessagePayload rawMessage payload msgId hasWaitingChannel hasWaitingBatchChannel =
+        if (acksGroupingTracker.IsDuplicate(msgId)) then
+            Log.Logger.LogWarning("{0} Ignoring message as it was already being acked earlier by same consumer {1}", prefix, msgId)
+            increaseAvailablePermits rawMessage.Metadata.NumMessages
+        else
+            if (rawMessage.Metadata.NumMessages = 1 && not rawMessage.Metadata.HasNumMessagesInBatch) then
+                if isSameEntry(rawMessage.MessageId) && isPriorEntryIndex(rawMessage.MessageId.EntryId) then
+                    // We need to discard entries that were prior to startMessageId
+                    Log.Logger.LogInformation("{0} Ignoring message from before the startMessageId: {1}", prefix, startMessageId)
+                else
+                    let msgKey = rawMessage.MessageKey
+                    let getValue () =
+                        keyValueProcessor
+                        |> ValueOption.map(fun kvp -> kvp.DecodeKeyValue(msgKey, payload) :?> 'T)
+                        |> ValueOption.defaultWith(fun () -> schema.Decode(payload))
+                    let message = {
+                        GetValue = getValue
+                        MessageId = msgId
+                        Data = payload
+                        Key = %msgKey
+                        HasBase64EncodedKey = rawMessage.IsKeyBase64Encoded
+                        Properties = rawMessage.Properties
+                    } 
+                    if (rawMessage.RedeliveryCount >= deadLettersProcessor.MaxRedeliveryCount) then
+                        deadLettersProcessor.AddMessage message.MessageId message
+                    if hasWaitingChannel then
+                        let waitingChannel = waiters.Dequeue()
+                        if (incomingMessages.Count = 0) then
+                            replyWithMessage waitingChannel message
+                        else
+                            enqueueMessage message
+                            replyWithMessage waitingChannel <| dequeueMessage()       
+                    else
+                        enqueueMessage message
+                        if hasWaitingBatchChannel && hasEnoughMessagesForBatchReceive() then
+                            let cts, ch = batchWaiters.Dequeue()
+                            replyWithBatch (Some cts) ch
+                            
+            elif rawMessage.Metadata.NumMessages > 0 then
+                // handle batch message enqueuing; uncompressed payload has all messages in batch
+                try
+                    receiveIndividualMessagesFromBatch rawMessage payload
+                with ex ->
+                    Log.Logger.LogError(ex, "{0} Batch reading exception {1}", prefix, msgId)
+                    raise <| BatchDeserializationException "Batch reading exception"
+                if hasWaitingChannel && incomingMessages.Count > 0 then
+                    let waitingChannel = waiters.Dequeue()
+                    replyWithMessage waitingChannel <| dequeueMessage()
+            else
+                Log.Logger.LogWarning("{0} Received message with nonpositive numMessages: {1}", prefix, rawMessage.Metadata.NumMessages)
+        
     
     let consumerIsReconnectedToBroker() =
         Log.Logger.LogInformation("{0} subscribed to topic {1}", prefix, consumerConfig.Topic)
@@ -576,54 +628,17 @@ type internal ConsumerImpl<'T> (consumerConfig: ConsumerConfiguration<'T>, clien
                     Log.Logger.LogDebug("{0} MessageReceived {1} queueLength={2}, hasWaitingChannel={3},  hasWaitingBatchChannel={4}",
                         prefix, msgId, incomingMessages.Count, hasWaitingChannel, hasWaitingBatchChannel)
 
-                    if (acksGroupingTracker.IsDuplicate(msgId)) then
-                        Log.Logger.LogWarning("{0} Ignoring message as it was already being acked earlier by same consumer {1}", prefix, msgId)
-                        increaseAvailablePermits rawMessage.Metadata.NumMessages
+                    if rawMessage.CheckSumValid then
+                        try
+                             let payload = getDecompressPayload rawMessage
+                             handleMessagePayload rawMessage payload msgId hasWaitingChannel hasWaitingBatchChannel
+                        with
+                            | DecompressionException _ ->
+                                do! tryDiscard msgId clientCnx CommandAck.ValidationError.DecompressionError
+                            | BatchDeserializationException _ ->
+                                do! tryDiscard msgId clientCnx CommandAck.ValidationError.BatchDeSerializeError
                     else
-                        if (rawMessage.Metadata.NumMessages = 1 && not rawMessage.Metadata.HasNumMessagesInBatch) then
-                            if isSameEntry(rawMessage.MessageId) && isPriorEntryIndex(rawMessage.MessageId.EntryId) then
-                                // We need to discard entries that were prior to startMessageId
-                                Log.Logger.LogInformation("{0} Ignoring message from before the startMessageId: {1}", prefix, startMessageId)
-                            else
-                                match parseMessage rawMessage with
-                                | ParseOk struct(payload, value) ->                                    
-                                    let message = {
-                                        Value = value
-                                        MessageId = msgId
-                                        Data = payload
-                                        Key = %rawMessage.MessageKey
-                                        IsKeyBase64Encoded = rawMessage.IsKeyBase64Encoded
-                                        Properties = rawMessage.Properties
-                                    } 
-                                    if (rawMessage.RedeliveryCount >= deadLettersProcessor.MaxRedeliveryCount) then
-                                        deadLettersProcessor.AddMessage message.MessageId message
-                                    if hasWaitingChannel then
-                                        let waitingChannel = waiters.Dequeue()
-                                        if (incomingMessages.Count = 0) then
-                                            replyWithMessage waitingChannel message
-                                        else
-                                            enqueueMessage message
-                                            replyWithMessage waitingChannel <| dequeueMessage()       
-                                    else
-                                        enqueueMessage message
-                                        if hasWaitingBatchChannel && hasEnoughMessagesForBatchReceive() then
-                                            let cts, ch = batchWaiters.Dequeue()
-                                            replyWithBatch (Some cts) ch
-                                | ParseError err ->
-                                    let! discardResult = discardCorruptedMessage msgId clientCnx err
-                                    if discardResult then
-                                        Log.Logger.LogInformation("{0} Message {1} was discarded", prefix, msgId)
-                                    else
-                                        Log.Logger.LogWarning("{0} Unable to discard {1}", prefix, msgId)
-                                        
-                        elif rawMessage.Metadata.NumMessages > 0 then
-                            // handle batch message enqueuing; uncompressed payload has all messages in batch
-                            receiveIndividualMessagesFromBatch rawMessage (getDecompressPayload rawMessage)
-                            if hasWaitingChannel && incomingMessages.Count > 0 then
-                                let waitingChannel = waiters.Dequeue()
-                                replyWithMessage waitingChannel <| dequeueMessage()
-                        else
-                            Log.Logger.LogWarning("{0} Received message with nonpositive numMessages: {1}", prefix, rawMessage.Metadata.NumMessages)
+                        do! tryDiscard msgId clientCnx CommandAck.ValidationError.ChecksumMismatch
                     return! loop ()
 
                 | ConsumerMessage.Receive ch ->

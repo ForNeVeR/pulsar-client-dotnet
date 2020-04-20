@@ -61,7 +61,7 @@ let tests =
 
             let! msg = consumer.ReceiveAsync() |> Async.AwaitTask
 
-            Expect.equal "" sentText msg.Value
+            Expect.equal "" sentText (msg.GetValue())
 
             Log.Debug("Finished String schema works fine")
         }
@@ -89,7 +89,7 @@ let tests =
 
             let! msg = consumer.ReceiveAsync() |> Async.AwaitTask
 
-            Expect.equal "" input msg.Value
+            Expect.equal "" input (msg.GetValue())
 
             Log.Debug("Finished Json schema works fine")
         }
@@ -116,9 +116,9 @@ let tests =
 
             let! msg = consumer.ReceiveAsync() |> Async.AwaitTask
             
-            Expect.isTrue "" msg.IsKeyBase64Encoded
-            Expect.equal "" "one" msg.Value.Value
-            Expect.equal "" true msg.Value.Key
+            Expect.isTrue "" msg.HasBase64EncodedKey
+            Expect.equal "" "one" (msg.GetValue()).Value
+            Expect.equal "" true (msg.GetValue()).Key
 
             Log.Debug("Finished KeyValue schema separated works fine")
         }
@@ -145,9 +145,9 @@ let tests =
 
             let! msg = consumer.ReceiveAsync() |> Async.AwaitTask
             
-            Expect.isFalse "" msg.IsKeyBase64Encoded
-            Expect.equal "" "one" msg.Value.Value
-            Expect.equal "" true msg.Value.Key
+            Expect.isFalse "" msg.HasBase64EncodedKey
+            Expect.equal "" "one" (msg.GetValue()).Value
+            Expect.equal "" true (msg.GetValue()).Key
 
             Log.Debug("Finished KeyValue schema inline works fine")
         }
@@ -174,7 +174,7 @@ let tests =
 
             let! msg = consumer.ReceiveAsync() |> Async.AwaitTask
 
-            Expect.equal "" input msg.Value
+            Expect.equal "" input (msg.GetValue())
 
             Log.Debug("Finished Protobuf schema works fine")
         }
@@ -202,7 +202,7 @@ let tests =
 
             let! msg = consumer.ReceiveAsync() |> Async.AwaitTask
 
-            Expect.equal "" input msg.Value
+            Expect.equal "" input (msg.GetValue())
 
             Log.Debug("Finished Avro schema works fine")
         }

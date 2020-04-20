@@ -6,7 +6,7 @@ open Avro.IO
 open Avro.Reflect
 open System.IO
 open Pulsar.Client.Api
-open SharpPulsar.Impl.Schema
+open AvroSchemaGenerator
 open Pulsar.Client.Common
 
 type AvroSchema<'T>() =

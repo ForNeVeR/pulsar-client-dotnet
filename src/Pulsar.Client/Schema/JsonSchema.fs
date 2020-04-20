@@ -4,7 +4,7 @@ open System
 open System.Text
 open System.Text.Json
 open Pulsar.Client.Api
-open SharpPulsar.Impl.Schema
+open AvroSchemaGenerator
 
 type JsonSchema<'T>() =
     let options = JsonSerializerOptions(IgnoreNullValues = true)
