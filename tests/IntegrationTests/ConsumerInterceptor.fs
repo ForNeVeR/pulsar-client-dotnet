@@ -32,7 +32,7 @@ type ConsumerInterceptorOnAcknowledge() =
     member val AckMessageIds = ResizeArray<MessageId>() with get
     member val AckCumulativeMessageIds = ResizeArray<MessageId>() with get
     member val AckNegativeMessageIds = ResizeArray<MessageId>() with get
-    member val AckTimeoutMessageIds = System.Collections.Concurrent.ConcurrentBag<MessageId>() with get
+    member val AckTimeoutMessageIds = ResizeArray<MessageId>() with get
 
     interface IConsumerInterceptor with
         member this.Close() =
@@ -324,7 +324,7 @@ let tests =
 
             do! Task.WhenAll(producerTask, consumerTask) |> Async.AwaitTask
             
-            do! Async.Sleep 3000
+            do! Async.Sleep 6000
             
             let inMessagesIdSet = messageIds |> Set.ofSeq
             let ackMessagesIdSet = consumerInterceptor.AckTimeoutMessageIds |> Seq.map id |> Set.ofSeq
