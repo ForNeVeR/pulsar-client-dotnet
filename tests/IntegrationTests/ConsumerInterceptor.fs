@@ -32,7 +32,7 @@ type ConsumerInterceptorOnAcknowledge() =
     member val AckMessageIds = ResizeArray<MessageId>() with get
     member val AckCumulativeMessageIds = ResizeArray<MessageId>() with get
     member val AckNegativeMessageIds = ResizeArray<MessageId>() with get
-    member val AckTimeoutMessageIds = ResizeArray<MessageId>() with get
+    member val AckTimeoutMessageIds = System.Collections.Concurrent.ConcurrentBag<MessageId>() with get
 
     interface IConsumerInterceptor with
         member this.Close() =
@@ -51,7 +51,7 @@ type ConsumerInterceptorOnAcknowledge() =
 [<Tests>]
 let tests =
     testList "ConsumerInterceptor" [
-        testAsync "Check OnClose" {
+        ptestAsync "Check OnClose" {
 
             let client = getClient()
             let topicName = "public/default/topic-" + Guid.NewGuid().ToString("N")
@@ -91,7 +91,7 @@ let tests =
 
             if not consumerInterceptor.Closed then failwith "OnClose missed"
         }
-        testAsync "Check BeforeConsume" {
+        ptestAsync "Check BeforeConsume" {
 
             let client = getClient()
             let topicName = "public/default/topic-" + Guid.NewGuid().ToString("N")
@@ -131,7 +131,7 @@ let tests =
 
             do! Task.WhenAll(producerTask, consumerTask) |> Async.AwaitTask
         }
-        testAsync "Check OnAcknowledge" {
+        ptestAsync "Check OnAcknowledge" {
 
             let client = getClient()
             let topicName = "public/default/topic-" + Guid.NewGuid().ToString("N")
@@ -175,7 +175,7 @@ let tests =
 
             if not (inMessagesIdSet - ackMessagesIdSet).IsEmpty then failwith "MessageIds in OnAcknowledge not equal to send messageIds"
         }
-        testAsync "Check OnAcknowledgeCumulative" {
+        ptestAsync "Check OnAcknowledgeCumulative" {
 
             let client = getClient()
             let topicName = "public/default/topic-" + Guid.NewGuid().ToString("N")
@@ -240,7 +240,7 @@ let tests =
                     failwith "No interceptor for secondAck"
             | _ -> failwith "MessageIdType should be Cumulative"
         }
-        testAsync "Check OnNegativeAcksSend" {
+        ptestAsync "Check OnNegativeAcksSend" {
 
             let client = getClient()
             let topicName = "public/default/topic-" + Guid.NewGuid().ToString("N")

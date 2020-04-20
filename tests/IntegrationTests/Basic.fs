@@ -409,7 +409,7 @@ let tests =
         }
         
         // Before running this test set 'maxMessageSize' for broker and 'nettyMaxFrameSizeBytes' for bookkeeper 
-        ptestAsync "Send large message works fine" {
+        testAsync "Send large message works fine" {
 
             Log.Debug("Started Send large message works fine")
             let client = getClient()
