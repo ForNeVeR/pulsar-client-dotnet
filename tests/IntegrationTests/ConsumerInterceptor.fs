@@ -306,6 +306,7 @@ let tests =
                     .SubscriptionName("test-subscription")
                     .Intercept(consumerInterceptor)
                     .AckTimeout(TimeSpan.FromMilliseconds(1000.0))
+                    .AckTimeoutTickTime(TimeSpan.FromMilliseconds(200.0))
                     .SubscribeAsync() |> Async.AwaitTask
 
             let producerTask =
