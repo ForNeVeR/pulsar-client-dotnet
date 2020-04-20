@@ -460,9 +460,9 @@ type internal ConsumerImpl<'T> (consumerConfig: ConsumerConfiguration<'T>, clien
         async {
             let! discardResult = discardCorruptedMessage msgId clientCnx err
             if discardResult then
-                Log.Logger.LogInformation("{0} Message {1} was discarded", prefix, msgId)
+                Log.Logger.LogInformation("{0} Message {1} was discarded due to {2}", prefix, msgId, err)
             else
-                Log.Logger.LogWarning("{0} Unable to discard {1}", prefix, msgId)
+                Log.Logger.LogWarning("{0} Unable to discard {1} due to {2}", prefix, msgId, err)
         }
         
     let handleMessagePayload rawMessage payload msgId hasWaitingChannel hasWaitingBatchChannel =
@@ -629,14 +629,17 @@ type internal ConsumerImpl<'T> (consumerConfig: ConsumerConfiguration<'T>, clien
                         prefix, msgId, incomingMessages.Count, hasWaitingChannel, hasWaitingBatchChannel)
 
                     if rawMessage.CheckSumValid then
-                        try
-                             let payload = getDecompressPayload rawMessage
-                             handleMessagePayload rawMessage payload msgId hasWaitingChannel hasWaitingBatchChannel
-                        with
-                            | DecompressionException _ ->
-                                do! tryDiscard msgId clientCnx CommandAck.ValidationError.DecompressionError
-                            | BatchDeserializationException _ ->
-                                do! tryDiscard msgId clientCnx CommandAck.ValidationError.BatchDeSerializeError
+                        if rawMessage.Payload.Length <= clientCnx.MaxMessageSize then
+                            try
+                                 let payload = getDecompressPayload rawMessage
+                                 handleMessagePayload rawMessage payload msgId hasWaitingChannel hasWaitingBatchChannel
+                            with
+                                | DecompressionException _ ->
+                                    do! tryDiscard msgId clientCnx CommandAck.ValidationError.DecompressionError
+                                | BatchDeserializationException _ ->
+                                    do! tryDiscard msgId clientCnx CommandAck.ValidationError.BatchDeSerializeError
+                        else
+                            do! tryDiscard msgId clientCnx CommandAck.ValidationError.UncompressedSizeCorruption
                     else
                         do! tryDiscard msgId clientCnx CommandAck.ValidationError.ChecksumMismatch
                     return! loop ()
