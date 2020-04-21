@@ -51,7 +51,7 @@ type ConsumerInterceptorOnAcknowledge() =
 [<Tests>]
 let tests =
     testList "ConsumerInterceptor" [
-        ptestAsync "Check OnClose" {
+        testAsync "Check OnClose" {
 
             let client = getClient()
             let topicName = "public/default/topic-" + Guid.NewGuid().ToString("N")
@@ -91,7 +91,7 @@ let tests =
 
             if not consumerInterceptor.Closed then failwith "OnClose missed"
         }
-        ptestAsync "Check BeforeConsume" {
+        testAsync "Check BeforeConsume" {
 
             let client = getClient()
             let topicName = "public/default/topic-" + Guid.NewGuid().ToString("N")
@@ -131,7 +131,7 @@ let tests =
 
             do! Task.WhenAll(producerTask, consumerTask) |> Async.AwaitTask
         }
-        ptestAsync "Check OnAcknowledge" {
+        testAsync "Check OnAcknowledge" {
 
             let client = getClient()
             let topicName = "public/default/topic-" + Guid.NewGuid().ToString("N")
@@ -175,7 +175,7 @@ let tests =
 
             if not (inMessagesIdSet - ackMessagesIdSet).IsEmpty then failwith "MessageIds in OnAcknowledge not equal to send messageIds"
         }
-        ptestAsync "Check OnAcknowledgeCumulative" {
+        testAsync "Check OnAcknowledgeCumulative" {
 
             let client = getClient()
             let topicName = "public/default/topic-" + Guid.NewGuid().ToString("N")
@@ -240,7 +240,7 @@ let tests =
                     failwith "No interceptor for secondAck"
             | _ -> failwith "MessageIdType should be Cumulative"
         }
-        ptestAsync "Check OnNegativeAcksSend" {
+        testAsync "Check OnNegativeAcksSend" {
 
             let client = getClient()
             let topicName = "public/default/topic-" + Guid.NewGuid().ToString("N")
@@ -306,7 +306,6 @@ let tests =
                     .SubscriptionName("test-subscription")
                     .Intercept(consumerInterceptor)
                     .AckTimeout(TimeSpan.FromMilliseconds(1000.0))
-                    .AckTimeoutTickTime(TimeSpan.FromMilliseconds(200.0))
                     .SubscribeAsync() |> Async.AwaitTask
 
             let producerTask =
@@ -325,11 +324,12 @@ let tests =
 
             do! Task.WhenAll(producerTask, consumerTask) |> Async.AwaitTask
             
-            do! Async.Sleep 2000
+            do! Async.Sleep 4000
             
             let inMessagesIdSet = messageIds |> Set.ofSeq
             let ackMessagesIdSet = consumerInterceptor.AckTimeoutMessageIds |> Seq.map id |> Set.ofSeq
-
+            
+            do! consumer.UnsubscribeAsync() |> Async.AwaitTask
             if not (inMessagesIdSet - ackMessagesIdSet).IsEmpty then
                 let diff = inMessagesIdSet - ackMessagesIdSet |> Set.map(fun m -> string m.EntryId) |> String.concat ";"
                 failwith (sprintf "MessageIds in AckTimeoutMessageIds not equal to send messageIds: %s" diff)
