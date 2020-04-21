@@ -77,7 +77,7 @@ let tests =
             let! consumer =
                 ConsumerBuilder(client)
                     .Topic(topicName)
-                    .ConsumerName("concurrent")
+                    .ConsumerName("OnClose")
                     .SubscriptionName("test-subscription")
                     .SubscribeAsync() |> Async.AwaitTask
 
@@ -115,7 +115,7 @@ let tests =
             let! consumer =
                 ConsumerBuilder(client)
                     .Topic(topicName)
-                    .ConsumerName("concurrent")
+                    .ConsumerName("Eligible")
                     .SubscriptionName("test-subscription")
                     .SubscribeAsync() |> Async.AwaitTask
             let! producer =
@@ -179,7 +179,7 @@ let tests =
             let! consumer =
                 ConsumerBuilder(client)
                     .Topic(topicName)
-                    .ConsumerName("concurrent")
+                    .ConsumerName("BeforeSend")
                     .SubscriptionName("test-subscription")
                     .SubscribeAsync() |> Async.AwaitTask
 
@@ -220,7 +220,7 @@ let tests =
             let! consumer =
                 ConsumerBuilder(client)
                     .Topic(topicName)
-                    .ConsumerName("concurrent")
+                    .ConsumerName("OnSendAcknowledgement")
                     .SubscriptionName("test-subscription")
                     .SubscribeAsync() |> Async.AwaitTask
 

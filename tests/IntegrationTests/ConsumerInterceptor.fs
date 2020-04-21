@@ -67,7 +67,7 @@ let tests =
             let! consumer =
                 ConsumerBuilder(client)
                     .Topic(topicName)
-                    .ConsumerName("concurrent")
+                    .ConsumerName("OnClose")
                     .SubscriptionName("test-subscription")
                     .Intercept(consumerInterceptor)
                     .SubscribeAsync() |> Async.AwaitTask
@@ -105,7 +105,7 @@ let tests =
             let! consumer =
                 ConsumerBuilder(client)
                     .Topic(topicName)
-                    .ConsumerName("concurrent")
+                    .ConsumerName("BeforeConsume")
                     .SubscriptionName("test-subscription")
                     .Intercept(ConsumerInterceptorBeforeConsume())
                     .SubscribeAsync() |> Async.AwaitTask
@@ -147,7 +147,7 @@ let tests =
             let! consumer =
                 ConsumerBuilder(client)
                     .Topic(topicName)
-                    .ConsumerName("concurrent")
+                    .ConsumerName("OnAcknowledge")
                     .SubscriptionName("test-subscription")
                     .Intercept(consumerInterceptor)
                     .SubscribeAsync() |> Async.AwaitTask
@@ -193,7 +193,7 @@ let tests =
             let! consumer =
                 ConsumerBuilder(client)
                     .Topic(topicName)
-                    .ConsumerName("concurrent")
+                    .ConsumerName("OnAcknowledgeCumulative")
                     .SubscriptionName("test-subscription")
                     .Intercept(consumerInterceptor)
                     .SubscribeAsync() |> Async.AwaitTask
@@ -256,7 +256,7 @@ let tests =
             let! consumer =
                 ConsumerBuilder(client)
                     .Topic(topicName)
-                    .ConsumerName("concurrent")
+                    .ConsumerName("OnNegativeAcksSend")
                     .SubscriptionName("test-subscription")
                     .Intercept(consumerInterceptor)
                     .NegativeAckRedeliveryDelay(TimeSpan(100L))
@@ -302,7 +302,7 @@ let tests =
             let! consumer =
                 ConsumerBuilder(client)
                     .Topic(topicName)
-                    .ConsumerName("concurrent")
+                    .ConsumerName("OnAckTimeoutSend")
                     .SubscriptionName("test-subscription")
                     .Intercept(consumerInterceptor)
                     .AckTimeout(TimeSpan.FromMilliseconds(1000.0))
