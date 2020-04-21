@@ -15,6 +15,7 @@ open Serilog.Sinks.SystemConsole.Themes
 [<Literal>]
 let pulsarAddress = "pulsar://127.0.0.1:6650"
 
+#if !NOTLS
 [<Literal>]
 let pulsarSslAddress = "pulsar+ssl://127.0.0.1:6651"
 
@@ -24,7 +25,7 @@ let pulsarSslAddress = "pulsar+ssl://127.0.0.1:6651"
 let ca = new Security.Cryptography.X509Certificates.X509Certificate2(@"../ssl/ca.cert.pem")
 let sslAdmin = AuthenticationFactory.tls(@"../ssl/admin.pfx")
 let sslUser1 = AuthenticationFactory.tls(@"../ssl/user1.pfx")
-
+#endif
 
 let configureLogging() =
     Log.Logger <-
@@ -47,6 +48,9 @@ let commonClient =
         .ServiceUrl(pulsarAddress)
         .Build()
 
+let getClient() = commonClient
+
+#if !NOTLS
 let sslClient =
     PulsarClientBuilder()
         .ServiceUrl(pulsarSslAddress)
@@ -69,14 +73,13 @@ let sslUser1Client =
         .TlsTrustCertificate(ca)
         .Authentication(sslUser1)
         .Build()
-
-let getClient() = commonClient
-
+        
 let getSslClient() = sslClient
 
 let getSslAdminClient() = sslAdminClient
 
 let getSslUser1Client() = sslUser1Client
+#endif
 
 let getNewClient() =
     PulsarClientBuilder()
